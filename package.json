@@ -4,24 +4,42 @@
   "description": "",
   "version": "0.0.1",
   "engines": {
-    "vscode": "^1.70.0"
+    "vscode": "^1.69.0"
   },
   "categories": [
     "Other"
   ],
   "activationEvents": [
-    "onCommand:comint.helloWorld"
+    "onStartupFinished",
+		"onFileSystem:comint",
+    "onCommand:comint.sendInput",
+    "onCommand:comint.newShell"
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "keybindings": [
+      {
+        "command": "comint.sendInput",
+        "title": "Comint Send Input",
+        "when": "resourceScheme == comint",
+        "key": "enter",
+        "mac": "enter"
+      }
+    ],
     "commands": [
       {
-        "command": "comint.helloWorld",
-        "title": "Hello World"
+        "command": "comint.sendInput",
+        "title": "Comint Send Input",
+        "when": "resourceScheme == comint"
+      },
+      {
+        "command": "comint.newShell",
+        "title": "Comint New Shell"
       }
     ]
   },
   "scripts": {
+    "rebuild": "electron-rebuild -f -w comint -v 18.3.5",
     "vscode:prepublish": "yarn run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
@@ -30,16 +48,21 @@
     "test": "node ./out/test/runTest.js"
   },
   "devDependencies": {
-    "@types/vscode": "^1.70.0",
     "@types/glob": "^7.2.0",
     "@types/mocha": "^9.1.1",
     "@types/node": "16.x",
+    "@types/vscode": "^1.69.0",
     "@typescript-eslint/eslint-plugin": "^5.31.0",
     "@typescript-eslint/parser": "^5.31.0",
+    "@vscode/test-electron": "^2.1.5",
+    "electron-rebuild": "^3.2.9",
     "eslint": "^8.20.0",
     "glob": "^8.0.3",
     "mocha": "^10.0.0",
-    "typescript": "^4.7.4",
-    "@vscode/test-electron": "^2.1.5"
+    "typescript": "^4.7.4"
+  },
+  "dependencies": {
+    "node-gyp": "^8.3.0",
+    "node-pty": "0.11.0-beta20"
   }
 }
