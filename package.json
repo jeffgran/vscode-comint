@@ -24,6 +24,13 @@
         "when": "resourceScheme == comint",
         "key": "enter",
         "mac": "enter"
+      },
+      {
+        "command": "comint.clear",
+        "title": "Comint Clear Screen",
+        "when": "resourceScheme == comint",
+        "key": "ctrl+k",
+        "mac": "cmd+k"
       }
     ],
     "commands": [

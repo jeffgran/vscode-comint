@@ -6,9 +6,13 @@ import { MemFS } from './fileSystemProvider';
 // - make sure it shows the initial prompt?
 // - kill the process when closing the document.
 // - auto-load the extension using onDidChangeWorkspaceFolders somehow instead of loading it on launch
-// - decorate the buffer with readonly for prompt
-// - auto filter out the prompt from the line when pressing return
+// X decorate the buffer with readonly for prompt
+// X auto filter out the prompt from the line when pressing return
 // - follow the cursor down if output flows off the screen.
+// - input ring
+// - cursorHome should go back to the end of the prompt if on a prompt line
+// X don't echo input
+// X clear command
 
 
 // TODO needs to be configurable.
@@ -42,7 +46,13 @@ export function activate(context: vscode.ExtensionContext) {
 		console.log("uri:", editor.document.uri);
 		console.log("line:", cmd);
 		
-		memFs.sendInput(editor.document.uri, cmd);
+		editor.edit(e => {
+			// insert a newline since we are not echoing input
+			// TODO also put in the line itself, if it did not come from the "end", after the last prompt.
+			edit.insert(editor.document.lineAt(editor.document.lineCount - 1).range.end, "\n");
+		}).then(() => {
+			memFs.sendInput(editor.document.uri, cmd);
+		});
 	}));
 	
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.onData', (editor, edit, _uri, data) => {
@@ -51,11 +61,11 @@ export function activate(context: vscode.ExtensionContext) {
 	}));
 	
 	context.subscriptions.push(vscode.workspace.registerFileSystemProvider('comint', memFs, { isCaseSensitive: true, isReadonly: false }));
-
+	
 	const promptDecoration = vscode.window.createTextEditorDecorationType({
 		textDecoration: 'underline'
 	});
-
+	
 	context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(e => {
 		const lastLine = e.document.lineAt(e.document.lineCount - 1);
 		const match = lastLine.text.match(promptRegex);
@@ -71,12 +81,12 @@ export function activate(context: vscode.ExtensionContext) {
 		const ranges = memFs.getPromptRanges(editor.document.uri);
 		editor.setDecorations(promptDecoration, ranges);
 	}));
-
+	
 	context.subscriptions.push(vscode.commands.registerCommand('comint.newShell', _ => {
 		console.log("comint.newShell");
 		memFs.writeFile(vscode.Uri.parse(`comint:///foo.sh`), Buffer.from(''), { create: true, overwrite: true });
 	}));
-
+	
 	memFs.onDidChangeFile(events => {
 		console.log('memFs.onDidChangeFile');
 		events.forEach(async e => {
@@ -92,6 +102,13 @@ export function activate(context: vscode.ExtensionContext) {
 		console.log("workspaces.onDidOpenTextDocument");
 		memFs.startComint(e);
 	}));
+	
+	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.clear', (editor, edit) => {
+		const penultimateLine = editor.document.lineAt(editor.document.lineCount - 2);
+		const rangeToDelete = new vscode.Range(new vscode.Position(0, 0), penultimateLine.range.end);
+		edit.delete(rangeToDelete);
+	}));
+
 }
 
 // this method is called when your extension is deactivated

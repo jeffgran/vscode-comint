@@ -115,15 +115,18 @@ export class MemFS implements vscode.FileSystemProvider {
         console.log('startComint');
         const entry = this._lookupAsFile(e.uri, true);
         entry.document = e;
-        var proc = spawn("bash", ["-l"], {
+        var proc = spawn("/opt/homebrew/bin/bash", ["-l"], {
             name: 'xterm-color',
             cols: 80,
             rows: 30,
             cwd: process.env.HOME,
             env: process.env
         });
-        console.log(proc);
+        // TODO more general/configurable solution for these extras to set the shell up right
+        proc.write("stty echo\n");
+        proc.write("bind 'set enable-bracketed-paste off'\n");
         entry.proc = proc;
+
         let thenable: Thenable<undefined>;
 
         proc.onData((data: string) => {
