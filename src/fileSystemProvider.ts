@@ -7,7 +7,6 @@
 import * as path from 'path';
 import * as vscode from 'vscode';
 import {IPty, spawn} from 'node-pty';
-import { profileEnd } from 'console';
 
 export class File implements vscode.FileStat {
     
@@ -63,10 +62,8 @@ export class MemFS implements vscode.FileSystemProvider {
     }
     
     readDirectory(uri: vscode.Uri): [string, vscode.FileType][] {
-        console.log("this memfs:", this.root.ctime);
         const entry = this._lookupAsDirectory(uri, false);
         const result: [string, vscode.FileType][] = [];
-        console.log("entries:", entry.entries);
         for (const [name, child] of entry.entries) {
             result.push([name, child.type]);
         }
@@ -105,16 +102,15 @@ export class MemFS implements vscode.FileSystemProvider {
             entry = new File(basename);
             parent.entries.set(basename, entry);
             console.log("created file!");
-            console.log("in write thisMemfs:", this.root.ctime);
-            this._fireSoon({ type: vscode.FileChangeType.Created, uri });
         }
         entry.mtime = Date.now();
         entry.size = content.byteLength;
         entry.data = content;
-        this._fireSoon({ type: vscode.FileChangeType.Changed, uri });
+        this._fireSoon({ type: vscode.FileChangeType.Created, uri }, { type: vscode.FileChangeType.Changed, uri });
     }
 
     startComint(e: vscode.TextDocument) {
+        console.log('startComint');
         const entry = this._lookupAsFile(e.uri, true);
         entry.document = e;
         var proc = spawn("bash", ["-l"], {
@@ -129,8 +125,18 @@ export class MemFS implements vscode.FileSystemProvider {
         let thenable: Thenable<undefined>;
 
         proc.onData((data: string) => {
-            console.log(`data: ${data}`);
+            console.log(`proc.onData: ${data}`);
+            // if (entry.data === undefined) {
+            //     entry.data = Buffer.from(data);
+            //     entry.size = Buffer.from(data).length;
+            // } else {
+            //     entry.data.set(Buffer.from(data), entry.data.length);
+            //     entry.size = entry.size + Buffer.from(data).length;
+            // }
+            // this._fireSoon({ type: vscode.FileChangeType.Changed, uri: e.uri });
+            console.log("thenable:", thenable);
             if (thenable === undefined) {
+                console.log('attempting to executeCommand(comint.onData)');
                 thenable = vscode.commands.executeCommand("comint.onData", e.uri, data);
             } else {
                 thenable = thenable.then(() => {
@@ -258,7 +264,6 @@ export class MemFS implements vscode.FileSystemProvider {
             }
             
             this._fireSoonHandle = setTimeout(() => {
-                console.log("firing events:", this._bufferedEvents);
                 this._emitter.fire(this._bufferedEvents);
                 this._bufferedEvents.length = 0;
             }, 5);
