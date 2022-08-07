@@ -10,9 +10,7 @@
     "Other"
   ],
   "activationEvents": [
-    "onStartupFinished",
 		"onFileSystem:comint",
-    "onCommand:comint.sendInput",
     "onCommand:comint.newShell"
   ],
   "main": "./out/extension.js",
@@ -31,12 +29,23 @@
         "when": "resourceScheme == comint",
         "key": "ctrl+k",
         "mac": "cmd+k"
+      },
+      {
+        "command": "comint.inputRingPrevious",
+        "title": "Comint Input Ring Previous",
+        "when": "resourceScheme == comint",
+        "key": "ctrl+p",
+        "mac": "cmd+p"
       }
     ],
     "commands": [
       {
         "command": "comint.newShell",
         "title": "Comint New Shell"
+      },
+      {
+        "command": "comint.inputRingPrevious",
+        "title": "Comint Input Ring Previous"
       }
     ]
   },
