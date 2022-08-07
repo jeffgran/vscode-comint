@@ -35,11 +35,6 @@
     ],
     "commands": [
       {
-        "command": "comint.sendInput",
-        "title": "Comint Send Input",
-        "when": "resourceScheme == comint"
-      },
-      {
         "command": "comint.newShell",
         "title": "Comint New Shell"
       }

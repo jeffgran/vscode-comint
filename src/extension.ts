@@ -7,6 +7,7 @@ import { MemFS } from './fileSystemProvider';
 // - kill the process when closing the document.
 // - auto-load the extension using onDidChangeWorkspaceFolders somehow instead of loading it on launch
 // X decorate the buffer with readonly for prompt
+//   X BUG: the ranges don't update when the document changes. we might just have to re-calc them all each time. just check all lines.
 // X auto filter out the prompt from the line when pressing return
 // - follow the cursor down if output flows off the screen.
 // - input ring
@@ -32,7 +33,8 @@ export function activate(context: vscode.ExtensionContext) {
 		let cmd: string;
 		if (editor.selection.isEmpty) {
 			const line = editor.document.lineAt(editor.selection.end);
-			const prompts = memFs.getPromptRanges(editor.document.uri);
+			const comintBuffer = memFs.getComintBuffer(editor.document.uri);
+			const prompts = comintBuffer.getPromptRanges();
 			const intersection = prompts.map(p => line.range.intersection(p)).find(p => p);
 			if (intersection) {
 				cmd = editor.document.getText(new vscode.Range(intersection.end, line.range.end));
@@ -67,18 +69,28 @@ export function activate(context: vscode.ExtensionContext) {
 	});
 	
 	context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(e => {
-		const lastLine = e.document.lineAt(e.document.lineCount - 1);
-		const match = lastLine.text.match(promptRegex);
-		if (match) {
-			const len = match[0].length;
-			const startpos = lastLine.range.start;
-			memFs.addPromptRange(e.document.uri, new vscode.Range(startpos, new vscode.Position(lastLine.lineNumber, len - 1)))
-			vscode.commands.executeCommand('comint.setDecorations');
+		const comintBuffer = memFs.getComintBuffer(e.document.uri);
+		const ranges: vscode.Range[] = [];
+		// TODO be more efficient here and only replace the ranges for the 
+		// parts of the document that changed.
+		for(let i = 0; i < e.document.lineCount; i++) {
+			const line = e.document.lineAt(i);
+			console.log('line:', line.text);
+			const match = line.text.match(promptRegex);
+			console.log('match:', match);
+			if (match) {
+				const len = match[0].length;
+				const startpos = line.range.start;
+				ranges.push(new vscode.Range(startpos, new vscode.Position(line.lineNumber, len - 1)));
+			}
 		}
+		comintBuffer.setPromptRanges(ranges);
+		vscode.commands.executeCommand('comint.setDecorations');
 	}));
 	
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.setDecorations', (editor, _edit) => {
-		const ranges = memFs.getPromptRanges(editor.document.uri);
+		const comintBuffer = memFs.getComintBuffer(editor.document.uri);
+		const ranges = comintBuffer.getPromptRanges();
 		editor.setDecorations(promptDecoration, ranges);
 	}));
 	
@@ -100,7 +112,8 @@ export function activate(context: vscode.ExtensionContext) {
 	
 	context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(e => {
 		console.log("workspaces.onDidOpenTextDocument");
-		memFs.startComint(e);
+		const comintBuffer = memFs.getComintBuffer(e.uri);
+		comintBuffer.startComint(e.uri);
 	}));
 	
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.clear', (editor, edit) => {
@@ -108,7 +121,6 @@ export function activate(context: vscode.ExtensionContext) {
 		const rangeToDelete = new vscode.Range(new vscode.Position(0, 0), penultimateLine.range.end);
 		edit.delete(rangeToDelete);
 	}));
-
 }
 
 // this method is called when your extension is deactivated
