@@ -19,6 +19,7 @@ export class File implements vscode.FileStat {
     data?: Uint8Array;
     proc?: IPty;
     document?: vscode.TextDocument;
+    promptRanges: vscode.Range[];
     
     constructor(name: string) {
         this.type = vscode.FileType.File;
@@ -26,6 +27,7 @@ export class File implements vscode.FileStat {
         this.mtime = Date.now();
         this.size = 0;
         this.name = name;
+        this.promptRanges = [];
     }
 }
 
@@ -144,6 +146,16 @@ export class MemFS implements vscode.FileSystemProvider {
                 });
             }
         });
+    }
+
+    addPromptRange(uri: vscode.Uri, range: vscode.Range) {
+        const file = this._lookupAsFile(uri, false);
+        file.promptRanges.push(range);
+    }
+
+    getPromptRanges(uri: vscode.Uri): vscode.Range[] {
+        const file = this._lookupAsFile(uri, false);
+        return file.promptRanges;
     }
     
     // --- manage files/folders

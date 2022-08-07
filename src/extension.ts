@@ -52,16 +52,17 @@ export function activate(context: vscode.ExtensionContext) {
 		const lastLine = e.document.lineAt(e.document.lineCount - 1);
 		const match = lastLine.text.match(promptRegex);
 		if (match) {
-			console.log('match');
 			const len = match[0].length;
 			const startpos = lastLine.range.start;
-			vscode.commands.executeCommand('comint.setDecorations', new vscode.Range(startpos, new vscode.Position(lastLine.lineNumber, len - 1)));
+			memFs.addPromptRange(e.document.uri, new vscode.Range(startpos, new vscode.Position(lastLine.lineNumber, len - 1)))
+			vscode.commands.executeCommand('comint.setDecorations');
 		}
 	}));
 	
 	
-	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.setDecorations', (editor, edit, range) => {
-		editor.setDecorations(promptDecoration, [range]);
+	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.setDecorations', (editor, _edit) => {
+		const ranges = memFs.getPromptRanges(editor.document.uri);
+		editor.setDecorations(promptDecoration, ranges);
 	}));
 
 	context.subscriptions.push(vscode.commands.registerCommand('comint.newShell', _ => {
