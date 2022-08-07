@@ -1,3 +1,4 @@
+import { text } from 'stream/consumers';
 import * as vscode from 'vscode';
 import { MemFS } from './fileSystemProvider';
 
@@ -24,17 +25,24 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.sendInput', (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
 		console.log('comint.sendInput');
 		const range = editor.selection;
-		let line: string;
+		let cmd: string;
 		if (editor.selection.isEmpty) {
-			line = editor.document.lineAt(editor.selection.end).text;
+			const line = editor.document.lineAt(editor.selection.end);
+			const prompts = memFs.getPromptRanges(editor.document.uri);
+			const intersection = prompts.map(p => line.range.intersection(p)).find(p => p);
+			if (intersection) {
+				cmd = editor.document.getText(new vscode.Range(intersection.end, line.range.end));
+			} else {
+				cmd = line.text;
+			}
 		} else {
-			line = editor.document.getText(range);
+			cmd = editor.document.getText(range);
 		}
 		
 		console.log("uri:", editor.document.uri);
-		console.log("line:", line);
+		console.log("line:", cmd);
 		
-		memFs.sendInput(editor.document.uri, line);
+		memFs.sendInput(editor.document.uri, cmd);
 	}));
 	
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.onData', (editor, edit, _uri, data) => {
@@ -58,7 +66,6 @@ export function activate(context: vscode.ExtensionContext) {
 			vscode.commands.executeCommand('comint.setDecorations');
 		}
 	}));
-	
 	
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.setDecorations', (editor, _edit) => {
 		const ranges = memFs.getPromptRanges(editor.document.uri);
