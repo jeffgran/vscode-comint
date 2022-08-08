@@ -10,7 +10,6 @@
     "Other"
   ],
   "activationEvents": [
-		"onFileSystem:comint",
     "onCommand:comint.newShell"
   ],
   "main": "./out/extension.js",
@@ -36,6 +35,13 @@
         "when": "resourceScheme == comint",
         "key": "ctrl+p",
         "mac": "cmd+p"
+      },
+      {
+        "command": "comint.inputRingNext",
+        "title": "Comint Input Ring Next",
+        "when": "resourceScheme == comint",
+        "key": "ctrl+n",
+        "mac": "cmd+n"
       }
     ],
     "commands": [

@@ -12,6 +12,8 @@ export class ComintBuffer implements vscode.FileStat {
   data?: Uint8Array;
   proc?: IPty;
   promptRanges: vscode.Range[];
+  _inputRing: string[];
+  _inputRingIndex: number = 0;
   
   constructor(name: string) {
     this.type = vscode.FileType.File;
@@ -20,6 +22,7 @@ export class ComintBuffer implements vscode.FileStat {
     this.size = 0;
     this.name = name;
     this.promptRanges = [];
+    this._inputRing = [];
   }
   
   startComint(uri: vscode.Uri) {
@@ -41,14 +44,6 @@ export class ComintBuffer implements vscode.FileStat {
     
     proc.onData((data: string) => {
       console.log(`proc.onData: ${data}`);
-      // if (entry.data === undefined) {
-      //     entry.data = Buffer.from(data);
-      //     entry.size = Buffer.from(data).length;
-      // } else {
-      //     entry.data.set(Buffer.from(data), entry.data.length);
-      //     entry.size = entry.size + Buffer.from(data).length;
-      // }
-      // this._fireSoon({ type: vscode.FileChangeType.Changed, uri: e.uri });
       console.log("thenable:", thenable);
       if (thenable === undefined) {
         console.log('attempting to executeCommand(comint.onData)');
@@ -69,9 +64,41 @@ export class ComintBuffer implements vscode.FileStat {
   getPromptRanges(): vscode.Range[] {
     return this.promptRanges;
   }
-
+  
   setPromptRanges(ranges: vscode.Range[]) {
     this.promptRanges = ranges;
+  }
+  
+  pushInput(cmd: string) {
+    this._inputRing.push(cmd);
+    this._inputRingIndex = this._inputRing.length;
+  }
+  
+  getInputRingInput(): string {
+    return this._inputRing[this._inputRingIndex] || '';
+  }
+  
+  decrementInputRingIndex() {
+    this._inputRingIndex -= 1;
+    if (this._inputRingIndex < 0) {
+      this._inputRingIndex = this._inputRing.length - 1;
+    }
+  }
+  
+  incrementInputRingIndex() {
+    this._inputRingIndex += 1;
+    if (this._inputRingIndex >= this._inputRing.length) {
+      this._inputRingIndex = 0;
+    }
+  }
+  
+  lastPromptInputRange(editor: vscode.TextEditor): vscode.Range {
+    const ranges = this.getPromptRanges();
+    if (ranges.length === 0) {
+      return editor.selection;
+    }
+    const lastPrompt = ranges[ranges.length - 1];
+    return new vscode.Range(new vscode.Position(lastPrompt.end.line, lastPrompt.end.character), editor.document.lineAt(editor.document.lineCount - 1).range.end);
   }
   
 }
