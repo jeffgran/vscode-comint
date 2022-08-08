@@ -58,11 +58,6 @@ export class MemFS implements vscode.FileSystemProvider {
         throw vscode.FileSystemError.FileNotFound();
     }
     
-    sendInput(uri: vscode.Uri, line: string) {
-        const file = this._lookupAsFile(uri, false);
-        file.proc?.write(`${line}\n`);
-    }
-    
     writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): void {
         const basename = path.posix.basename(uri.path);
         const parent = this._lookupParentDirectory(uri);
@@ -77,14 +72,16 @@ export class MemFS implements vscode.FileSystemProvider {
             throw vscode.FileSystemError.FileExists(uri);
         }
         if (!entry) {
-            entry = new ComintBuffer(basename);
+            entry = new ComintBuffer(basename, uri);
             parent.entries.set(basename, entry);
             console.log("created file!");
+            this._fireSoon({ type: vscode.FileChangeType.Created, uri });
         }
         entry.mtime = Date.now();
         entry.size = content.byteLength;
         entry.data = content;
-        this._fireSoon({ type: vscode.FileChangeType.Created, uri }, { type: vscode.FileChangeType.Changed, uri });
+        this._fireSoon({ type: vscode.FileChangeType.Changed, uri });
+        vscode.commands.executeCommand('workbench.action.files.revert', uri);
     }
     
     // --- manage files/folders

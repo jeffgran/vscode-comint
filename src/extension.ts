@@ -4,11 +4,15 @@ import { MemFS } from './fileSystemProvider';
 import { Comint } from './comint';
 
 // TODO
-// - make sure it shows the initial prompt?
 // - kill the process when closing the document.
-// - input ring
 // - cursorHome should go back to the end of the prompt if on a prompt line
 // - make the prompt detection more performant
+// - input ring should have an empty item at the end/beginning
+// - ANSI decorations
+//
+// - all edits must take place in the file system.
+//   - especially 'clear'
+
 
 
 
@@ -26,7 +30,6 @@ export function activate(context: vscode.ExtensionContext) {
 	// context.subscriptions.push(vscode.commands.registerCommand('comint.initialize', comint.initialize));
 	context.subscriptions.push(vscode.commands.registerCommand('comint.newShell', comint.newShell));
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.sendInput', comint.sendInput));
-	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.onData', comint.onData));
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.setDecorations', comint.setDecorations));
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.stickyBottom', comint.stickyBottom));
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.inputRingPrevious', comint.inputRingPrevious));
@@ -38,6 +41,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(comint.onDidChangeWorkspaceFolders));
 	context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(comint.onDidOpenTextDocument));
 	context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(comint.onDidChangeTextDocument));
+	context.subscriptions.push(vscode.window.onDidChangeVisibleTextEditors(comint.onDidChangeVisibleTextEditors));
 }
 
 // this method is called when your extension is deactivated

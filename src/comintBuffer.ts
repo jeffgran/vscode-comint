@@ -1,5 +1,6 @@
 import * as vscode from 'vscode';
 import {IPty, spawn} from 'node-pty';
+import { MemFS } from './fileSystemProvider';
 
 export class ComintBuffer implements vscode.FileStat {
   
@@ -7,6 +8,7 @@ export class ComintBuffer implements vscode.FileStat {
   ctime: number;
   mtime: number;
   size: number;
+  uri: vscode.Uri;
   
   name: string;
   data?: Uint8Array;
@@ -15,7 +17,7 @@ export class ComintBuffer implements vscode.FileStat {
   _inputRing: string[];
   _inputRingIndex: number = 0;
   
-  constructor(name: string) {
+  constructor(name: string, uri: vscode.Uri) {
     this.type = vscode.FileType.File;
     this.ctime = Date.now();
     this.mtime = Date.now();
@@ -23,12 +25,12 @@ export class ComintBuffer implements vscode.FileStat {
     this.name = name;
     this.promptRanges = [];
     this._inputRing = [];
+    this.uri = uri;
   }
   
-  startComint(uri: vscode.Uri) {
+  startComint(uri: vscode.Uri, memfs: MemFS) {
     console.log('startComint');
-    const entry = this;
-    var proc = spawn("/opt/homebrew/bin/bash", ["-l"], {
+    this.proc = spawn("/opt/homebrew/bin/bash", ["-l"], {
       name: 'xterm-color',
       cols: 80,
       rows: 30,
@@ -36,25 +38,23 @@ export class ComintBuffer implements vscode.FileStat {
       env: process.env
     });
     // TODO more general/configurable solution for these extras to set the shell up right
-    proc.write("stty echo\n");
-    proc.write("bind 'set enable-bracketed-paste off'\n");
-    entry.proc = proc;
+    this.proc.write("stty echo\n");
+    this.proc.write("bind 'set enable-bracketed-paste off'\n");
     
     let thenable: Thenable<undefined>;
     
-    proc.onData((data: string) => {
-      console.log(`proc.onData: ${data}`);
-      console.log("thenable:", thenable);
-      if (thenable === undefined) {
-        console.log('attempting to executeCommand(comint.onData)');
-        thenable = vscode.commands.executeCommand("comint.onData", uri, data);
-      } else {
-        thenable = thenable.then(() => {
-          return vscode.commands.executeCommand("comint.onData", uri, data);
-        });
+    this.proc.onData((data: string) => {
+      try {
+        console.log('this.data.length', this.data?.length);
+        const oldLength = this.data?.length || 0;
+        const newdata = new Uint8Array(oldLength + data.length);
+        newdata.set(this.data || Buffer.from(''), 0);
+        newdata.set(Buffer.from(data), oldLength);
+        memfs.writeFile(uri, newdata, { create: false, overwrite: false });
+      } catch(e) {
+        console.log(e);
       }
     });
-    
   }
   
   addPromptRange(range: vscode.Range) {
@@ -70,6 +70,7 @@ export class ComintBuffer implements vscode.FileStat {
   }
   
   pushInput(cmd: string) {
+    this.proc?.write(`${cmd}\n`);
     this._inputRing.push(cmd);
     this._inputRingIndex = this._inputRing.length;
   }
