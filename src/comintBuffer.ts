@@ -9,6 +9,7 @@ export class ComintBuffer implements vscode.FileStat {
   mtime: number;
   size: number;
   uri: vscode.Uri;
+  _memFs: MemFS;
   
   name: string;
   data?: Uint8Array;
@@ -17,7 +18,7 @@ export class ComintBuffer implements vscode.FileStat {
   _inputRing: string[];
   _inputRingIndex: number = 0;
   
-  constructor(name: string, uri: vscode.Uri) {
+  constructor(name: string, uri: vscode.Uri, memFs: MemFS) {
     this.type = vscode.FileType.File;
     this.ctime = Date.now();
     this.mtime = Date.now();
@@ -26,9 +27,10 @@ export class ComintBuffer implements vscode.FileStat {
     this.promptRanges = [];
     this._inputRing = [];
     this.uri = uri;
+    this._memFs = memFs;
   }
   
-  startComint(uri: vscode.Uri, memfs: MemFS) {
+  startComint(uri: vscode.Uri) {
     console.log('startComint');
     this.proc = spawn("/opt/homebrew/bin/bash", ["-l"], {
       name: 'xterm-color',
@@ -50,7 +52,7 @@ export class ComintBuffer implements vscode.FileStat {
         const newdata = new Uint8Array(oldLength + data.length);
         newdata.set(this.data || Buffer.from(''), 0);
         newdata.set(Buffer.from(data), oldLength);
-        memfs.writeFile(uri, newdata, { create: false, overwrite: false });
+        this._memFs.writeFile(uri, newdata, { create: false, overwrite: false });
       } catch(e) {
         console.log(e);
       }
@@ -100,6 +102,35 @@ export class ComintBuffer implements vscode.FileStat {
     }
     const lastPrompt = ranges[ranges.length - 1];
     return new vscode.Range(new vscode.Position(lastPrompt.end.line, lastPrompt.end.character), editor.document.lineAt(editor.document.lineCount - 1).range.end);
+  }
+  
+  delete(startIndex: number, endIndex: number) {
+    if (!this.data) { throw new Error("Tried to delete but there is no data."); }
+    if (endIndex < startIndex) { throw new Error(`Invalid indices. startIndex (${startIndex}) is greater than endIndex ${endIndex}.`); }
+    
+    const sizeToDelete = endIndex - startIndex; // +1 ?
+    if (sizeToDelete > this.data.length) { throw new Error(`Cannot delete more data than is in the buffer! startIndex: ${startIndex}, endIndex: ${endIndex}, buffer size: ${this.data.length}`); }
+    
+    console.log(`startIndex: ${startIndex}`);
+    console.log(`endIndex: ${endIndex}`);
+    console.log(`sizeToDelete: ${sizeToDelete}`);
+    const newlen = this.data.length - (sizeToDelete);
+    console.log(`origLen: ${this.data.length}`);
+    console.log(`newlen: ${newlen}`);
+    const newdata = new Uint8Array(newlen);
+    
+    const firstSlice = this.data.slice(0, startIndex);
+    console.log(`firstSlice: ${Buffer.from(firstSlice).toString('utf-8')}`);
+    console.log(`firstSlice.length: ${firstSlice.length}`);
+    newdata.set(firstSlice, 0);
+    const secondSlice = this.data.slice(endIndex, this.data.length);
+    console.log(`secondSlice: ${Buffer.from(secondSlice).toString('utf-8')}`);
+    console.log(`secondSlice.length: ${secondSlice.length}`);
+    console.log(`newTotalLength: ${firstSlice.length + secondSlice.length}`);
+    newdata.set(secondSlice, startIndex);
+    
+    console.log(`newdata: ${newdata}`);
+    this._memFs.writeFile(this.uri, newdata, {create: false, overwrite: true});
   }
   
 }

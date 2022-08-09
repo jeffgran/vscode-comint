@@ -11,7 +11,8 @@ import { Comint } from './comint';
 // - ANSI decorations
 //
 // - all edits must take place in the file system.
-//   - especially 'clear'
+//   X especially 'clear'
+//   - even for typing? override the letter/etc input keys?
 
 
 

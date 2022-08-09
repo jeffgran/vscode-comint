@@ -79,9 +79,13 @@ export class Comint {
   clear = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
     console.log('comint.clear');
     if (editor.document.uri.scheme !== "comint") { return; }
+    const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const penultimateLine = editor.document.lineAt(editor.document.lineCount - 2);
     const rangeToDelete = new vscode.Range(new vscode.Position(0, 0), penultimateLine.range.end);
-    edit.delete(rangeToDelete);
+    const endByteOffset = Buffer.byteLength(editor.document.getText(rangeToDelete));
+     // TODO + 2 for CRLF at the end of the previous line?
+     // the problem is it isn't right on the first run, before we have entered any input... ???
+    comintBuffer.delete(0, endByteOffset);
   };
   
   inputRingPrevious = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
@@ -120,7 +124,7 @@ export class Comint {
     console.log("comint.onDidOpenTextDocument");
     
     const comintBuffer = this._memFs.getComintBuffer(doc.uri);
-    comintBuffer.startComint(doc.uri, this._memFs);
+    comintBuffer.startComint(doc.uri);
   };
   
   onDidChangeTextDocument = (e: vscode.TextDocumentChangeEvent) => {
