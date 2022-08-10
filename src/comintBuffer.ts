@@ -48,12 +48,16 @@ export class ComintBuffer implements vscode.FileStat {
     
     this.proc.onData((data: string) => {
       try {
-        console.log('this.data.length', this.data?.length);
+        console.log('[proc.onData] this.data.length', this.data?.length);
+        const databuffer = Buffer.from(data).filter(c => c !== 13); // strip out CR for now
         const oldLength = this.data?.length || 0;
-        const newdata = new Uint8Array(oldLength + data.length);
+        // console.log('[proc.onData] incomingdata.length', databuffer.length);
+        const newdata = new Uint8Array(oldLength + databuffer.length);
         newdata.set(this.data || Buffer.from(''), 0);
-        newdata.set(Buffer.from(data), oldLength);
-        this._memFs.writeFile(uri, newdata, { create: false, overwrite: false });
+        newdata.set(databuffer, oldLength);
+        // console.log('[proc.onData] newdata.length', newdata.length);
+        // console.log('newdata', Buffer.from(newdata).toJSON().data.toString());
+        this._memFs.writeFile(uri, newdata, { create: false, overwrite: true });
       } catch(e) {
         console.log(e);
       }
@@ -74,7 +78,8 @@ export class ComintBuffer implements vscode.FileStat {
   
   pushInput(cmd: string) {
     this.proc?.write(`${cmd}\n`);
-    this._insert(this.data!.length, "\n");
+    this._insert(this.data!.length, "\r\n");
+    this._memFs.writeFile(this.uri, this.data!, {create: false, overwrite: true});
     this._inputRing.push(cmd);
     this._inputRingIndex = this._inputRing.length;
   }
@@ -113,8 +118,8 @@ export class ComintBuffer implements vscode.FileStat {
   
   replace(startIndex: number, endIndex: number, replacement: string) {
     console.log('comintBuffer.replace');
-    console.log(`startIndex: ${startIndex}`);
-    console.log(`endIndex: ${endIndex}`);
+    // console.log(`startIndex: ${startIndex}`);
+    // console.log(`endIndex: ${endIndex}`);
     if (endIndex > startIndex) {
       this._delete(startIndex, endIndex);
     }
@@ -141,22 +146,22 @@ export class ComintBuffer implements vscode.FileStat {
     const sizeToDelete = endIndex - startIndex;
     if (sizeToDelete > this.data.length) { throw new Error(`Cannot delete more data than is in the buffer! startIndex: ${startIndex}, endIndex: ${endIndex}, buffer size: ${this.data.length}`); }
     
-    console.log(`startIndex: ${startIndex}`);
-    console.log(`endIndex: ${endIndex}`);
-    console.log(`sizeToDelete: ${sizeToDelete}`);
+    // console.log(`startIndex: ${startIndex}`);
+    // console.log(`endIndex: ${endIndex}`);
+    // console.log(`sizeToDelete: ${sizeToDelete}`);
     const newlen = this.data.length - (sizeToDelete);
-    console.log(`origLen: ${this.data.length}`);
-    console.log(`newlen: ${newlen}`);
+    // console.log(`origLen: ${this.data.length}`);
+    // console.log(`newlen: ${newlen}`);
     const newdata = new Uint8Array(newlen);
     
     const firstSlice = this.data.slice(0, startIndex);
-    console.log(`firstSlice: ${Buffer.from(firstSlice).toString('utf-8')}`);
-    console.log(`firstSlice.length: ${firstSlice.length}`);
+    // console.log(`firstSlice: ${Buffer.from(firstSlice).toString('utf-8')}`);
+    // console.log(`firstSlice.length: ${firstSlice.length}`);
     newdata.set(firstSlice, 0);
     const secondSlice = this.data.slice(endIndex, this.data.length);
-    console.log(`secondSlice: ${Buffer.from(secondSlice).toString('utf-8')}`);
-    console.log(`secondSlice.length: ${secondSlice.length}`);
-    console.log(`newTotalLength: ${firstSlice.length + secondSlice.length}`);
+    // console.log(`secondSlice: ${Buffer.from(secondSlice).toString('utf-8')}`);
+    // console.log(`secondSlice.length: ${secondSlice.length}`);
+    // console.log(`newTotalLength: ${firstSlice.length + secondSlice.length}`);
     newdata.set(secondSlice, startIndex);
     
     console.log(`newdata: ${newdata}`);

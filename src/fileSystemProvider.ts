@@ -81,6 +81,8 @@ export class MemFS implements vscode.FileSystemProvider {
         entry.size = content.byteLength;
         entry.data = content;
         this._fireSoon({ type: vscode.FileChangeType.Changed, uri });
+        // after writing to the underlying virtual file/buffer, we always immediately 
+        // "revert" the textdocument, so it reflects the new data, and doesn't show as "unsaved"
         vscode.commands.executeCommand('workbench.action.files.revert', uri);
     }
     

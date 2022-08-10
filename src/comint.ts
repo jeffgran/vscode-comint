@@ -90,6 +90,8 @@ export class Comint {
     const rangeToReplace = comintBuffer.lastPromptInputRange(editor);
     const startIndex = Buffer.byteLength(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.start)));
     const endIndex = Buffer.byteLength(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.end)));
+    // console.log('[comint.inputRingPrevious] bytelength', Buffer.byteLength(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.end))));
+    // console.log('[comint.inputRingPrevious] bytes', Buffer.from(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.end))).toJSON().data.toString());
     comintBuffer.decrementInputRingIndex();
     comintBuffer.replace(startIndex, endIndex, comintBuffer.getInputRingInput());
   };
