@@ -46,13 +46,7 @@ export class Comint {
       cmd = editor.document.getText(range);
     }
     
-    editor.edit(e => {
-      // insert a newline since we are not echoing input
-      // TODO also put in the line itself, if it did not come from the "end", after the last prompt.
-      edit.insert(editor.document.lineAt(editor.document.lineCount - 1).range.end, "\n");
-    }).then(() => {
-      comintBuffer.pushInput(cmd);
-    });
+    comintBuffer.pushInput(cmd);
   };
   
   setDecorations = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit, uri: vscode.Uri) => {
@@ -83,8 +77,8 @@ export class Comint {
     const penultimateLine = editor.document.lineAt(editor.document.lineCount - 2);
     const rangeToDelete = new vscode.Range(new vscode.Position(0, 0), penultimateLine.range.end);
     const endByteOffset = Buffer.byteLength(editor.document.getText(rangeToDelete));
-     // TODO + 2 for CRLF at the end of the previous line?
-     // the problem is it isn't right on the first run, before we have entered any input... ???
+    // TODO + 2 for CRLF at the end of the line?
+    // the problem is it isn't right on the first run, before we have entered any input... ???
     comintBuffer.delete(0, endByteOffset);
   };
   
@@ -94,8 +88,10 @@ export class Comint {
     
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const rangeToReplace = comintBuffer.lastPromptInputRange(editor);
+    const startIndex = Buffer.byteLength(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.start)));
+    const endIndex = Buffer.byteLength(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.end)));
     comintBuffer.decrementInputRingIndex();
-    edit.replace(rangeToReplace, comintBuffer.getInputRingInput());
+    comintBuffer.replace(startIndex, endIndex, comintBuffer.getInputRingInput());
   };
   
   inputRingNext = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
@@ -104,8 +100,10 @@ export class Comint {
     
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const rangeToReplace = comintBuffer.lastPromptInputRange(editor);
+    const startIndex = Buffer.byteLength(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.start)));
+    const endIndex = Buffer.byteLength(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.end)));
     comintBuffer.incrementInputRingIndex();
-    edit.replace(rangeToReplace, comintBuffer.getInputRingInput());
+    comintBuffer.replace(startIndex, endIndex, comintBuffer.getInputRingInput());
   };
   
   _handleMemfsFileChangeEvents = (events: vscode.FileChangeEvent[]) => {
@@ -135,7 +133,7 @@ export class Comint {
     if (e.contentChanges.length === 0) { return; }
     
     const comintBuffer = this._memFs.getComintBuffer(e.document.uri);
-
+    
     const ranges: vscode.Range[] = [];
     // TODO be more efficient here and only replace the ranges for the 
     // parts of the document that changed.

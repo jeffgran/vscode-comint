@@ -32,16 +32,17 @@ export class ComintBuffer implements vscode.FileStat {
   
   startComint(uri: vscode.Uri) {
     console.log('startComint');
-    this.proc = spawn("/opt/homebrew/bin/bash", ["-l"], {
+
+    this.proc = spawn("/opt/homebrew/bin/bash", ["-c", "bind 'set enable-bracketed-paste off' 2>/dev/null; /opt/homebrew/bin/bash"], {
       name: 'xterm-color',
       cols: 80,
       rows: 30,
       cwd: process.env.HOME,
       env: process.env
     });
+    
     // TODO more general/configurable solution for these extras to set the shell up right
-    this.proc.write("stty echo\n");
-    this.proc.write("bind 'set enable-bracketed-paste off'\n");
+    this.proc.write("stty -echo\n");
     
     let thenable: Thenable<undefined>;
     
@@ -73,6 +74,7 @@ export class ComintBuffer implements vscode.FileStat {
   
   pushInput(cmd: string) {
     this.proc?.write(`${cmd}\n`);
+    this._insert(this.data!.length, "\n");
     this._inputRing.push(cmd);
     this._inputRingIndex = this._inputRing.length;
   }
@@ -105,10 +107,38 @@ export class ComintBuffer implements vscode.FileStat {
   }
   
   delete(startIndex: number, endIndex: number) {
+    this._delete(startIndex, endIndex);
+    this._memFs.writeFile(this.uri, this.data!, {create: false, overwrite: true});
+  }
+  
+  replace(startIndex: number, endIndex: number, replacement: string) {
+    console.log('comintBuffer.replace');
+    console.log(`startIndex: ${startIndex}`);
+    console.log(`endIndex: ${endIndex}`);
+    if (endIndex > startIndex) {
+      this._delete(startIndex, endIndex);
+    }
+    this._insert(startIndex, replacement);
+    this._memFs.writeFile(this.uri, this.data!, {create: false, overwrite: true});
+  }
+  
+  _insert(index: number, insertion: string) {
+    if (!this.data) { throw new Error("Tried to insert but there is no data."); }
+    if (index > this.data.length) { throw new Error(`Invalid index. index (${index}) is greater than the data length (${this.data.length}).`); }
+    
+    const insertionBuffer = Buffer.from(insertion);
+    const newlen = this.data.length + insertion.length;
+    const newdata = new Uint8Array(newlen);
+    newdata.set(this.data, 0);
+    newdata.set(insertionBuffer, this.data.length);
+    this.data = newdata;
+  }
+  
+  _delete(startIndex: number, endIndex: number) {
     if (!this.data) { throw new Error("Tried to delete but there is no data."); }
     if (endIndex < startIndex) { throw new Error(`Invalid indices. startIndex (${startIndex}) is greater than endIndex ${endIndex}.`); }
     
-    const sizeToDelete = endIndex - startIndex; // +1 ?
+    const sizeToDelete = endIndex - startIndex;
     if (sizeToDelete > this.data.length) { throw new Error(`Cannot delete more data than is in the buffer! startIndex: ${startIndex}, endIndex: ${endIndex}, buffer size: ${this.data.length}`); }
     
     console.log(`startIndex: ${startIndex}`);
@@ -130,7 +160,6 @@ export class ComintBuffer implements vscode.FileStat {
     newdata.set(secondSlice, startIndex);
     
     console.log(`newdata: ${newdata}`);
-    this._memFs.writeFile(this.uri, newdata, {create: false, overwrite: true});
+    this.data = newdata;
   }
-  
 }
