@@ -1,5 +1,6 @@
 import { MemFS } from './fileSystemProvider';
 import * as vscode from 'vscode';
+import { ComintBuffer } from './comintBuffer';
 
 // decorations
 const promptDecoration = vscode.window.createTextEditorDecorationType({
@@ -77,8 +78,6 @@ export class Comint {
     const penultimateLine = editor.document.lineAt(editor.document.lineCount - 2);
     const rangeToDelete = new vscode.Range(new vscode.Position(0, 0), penultimateLine.range.end);
     const endByteOffset = Buffer.byteLength(editor.document.getText(rangeToDelete));
-    // TODO + 2 for CRLF at the end of the line?
-    // the problem is it isn't right on the first run, before we have entered any input... ???
     comintBuffer.delete(0, endByteOffset);
   };
   
@@ -88,12 +87,9 @@ export class Comint {
     
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const rangeToReplace = comintBuffer.lastPromptInputRange(editor);
-    const startIndex = Buffer.byteLength(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.start)));
-    const endIndex = Buffer.byteLength(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.end)));
-    // console.log('[comint.inputRingPrevious] bytelength', Buffer.byteLength(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.end))));
-    // console.log('[comint.inputRingPrevious] bytes', Buffer.from(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.end))).toJSON().data.toString());
     comintBuffer.decrementInputRingIndex();
-    comintBuffer.replace(startIndex, endIndex, comintBuffer.getInputRingInput());
+    //comintBuffer.replaceRange(rangeToReplace, comintBuffer.getInputRingInput(), editor.document);
+    edit.replace(rangeToReplace, comintBuffer.getInputRingInput());
   };
   
   inputRingNext = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
@@ -102,10 +98,9 @@ export class Comint {
     
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const rangeToReplace = comintBuffer.lastPromptInputRange(editor);
-    const startIndex = Buffer.byteLength(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.start)));
-    const endIndex = Buffer.byteLength(editor.document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.end)));
     comintBuffer.incrementInputRingIndex();
-    comintBuffer.replace(startIndex, endIndex, comintBuffer.getInputRingInput());
+    //comintBuffer.replaceRange(rangeToReplace, comintBuffer.getInputRingInput(), editor.document);
+    edit.replace(rangeToReplace, comintBuffer.getInputRingInput());
   };
   
   _handleMemfsFileChangeEvents = (events: vscode.FileChangeEvent[]) => {
@@ -118,13 +113,16 @@ export class Comint {
       }
     });
   };
-  
+
   onDidOpenTextDocument = (doc: vscode.TextDocument) => {
     if (doc.uri.scheme !== "comint") { return; }
     console.log("comint.onDidOpenTextDocument");
     
     const comintBuffer = this._memFs.getComintBuffer(doc.uri);
-    comintBuffer.startComint(doc.uri);
+    const e = vscode.window.activeTextEditor;
+    if (e !== undefined) {
+      comintBuffer.startComint(doc.uri, e);
+    }
   };
   
   onDidChangeTextDocument = (e: vscode.TextDocumentChangeEvent) => {
@@ -133,6 +131,10 @@ export class Comint {
     
     // no content was changed, we can ignore this event.
     if (e.contentChanges.length === 0) { return; }
+    e.contentChanges.forEach(cc => {
+      //console.log(cc);
+    });
+    //console.log('fulltext:', e.document.getText());
     
     const comintBuffer = this._memFs.getComintBuffer(e.document.uri);
     
@@ -155,7 +157,15 @@ export class Comint {
   
   onDidChangeVisibleTextEditors = (e: readonly vscode.TextEditor[]) => {
     e.forEach(editor => {
-      vscode.commands.executeCommand('comint.setDecorations', editor.document.uri);
+      if (editor.document.uri.scheme === 'comint') {
+        const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
+        comintBuffer.editor = editor;
+        if (comintBuffer.proc === undefined) {
+          comintBuffer.startComint(editor.document.uri, editor);
+        }
+        vscode.commands.executeCommand('workbench.action.files.revert'); // active editor
+        vscode.commands.executeCommand('comint.setDecorations', editor.document.uri);
+      }
     });
   };
 }
