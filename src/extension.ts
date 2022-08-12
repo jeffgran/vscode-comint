@@ -5,11 +5,12 @@ import { Comint } from './comint';
 
 // TODO
 // - kill the process when closing the document.
-// - cursorHome should go back to the end of the prompt if on a prompt line
 // - keep track of the insertion point so we can keep the user input if more output comes
 // - make the prompt detection more performant
+//   - only keep track of the last one? that's all we need really...
 // - input ring should have an empty item at the end/beginning
-// - ANSI decorations
+//   -integrate input ring with history file
+// - ANSI-color-for-comint-mode
 
 
 const comint = new Comint();
@@ -39,6 +40,7 @@ export function activate(context: vscode.ExtensionContext) {
 	// context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(comint.onDidChangeWorkspaceFolders));
 	context.subscriptions.push(vscode.workspace.onDidOpenTextDocument(comint.onDidOpenTextDocument));
 	context.subscriptions.push(vscode.workspace.onDidChangeTextDocument(comint.onDidChangeTextDocument));
+	context.subscriptions.push(vscode.window.onDidChangeTextEditorSelection(comint.onDidChangeTextEditorSelection));
 	context.subscriptions.push(vscode.window.onDidChangeVisibleTextEditors(comint.onDidChangeVisibleTextEditors));
 }
 

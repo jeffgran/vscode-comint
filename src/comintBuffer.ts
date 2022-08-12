@@ -117,13 +117,17 @@ export class ComintBuffer implements vscode.FileStat {
     }
   }
   
-  lastPromptInputRange(editor: vscode.TextEditor): vscode.Range {
+  lastPromptInputRange(): vscode.Range {
+    if (this.editor === undefined) {
+      throw new Error('No Editor!');
+    }
+
     const ranges = this.getPromptRanges();
     if (ranges.length === 0) {
-      return editor.selection;
+      return this.editor.selection;
     }
     const lastPrompt = ranges[ranges.length - 1];
-    return new vscode.Range(new vscode.Position(lastPrompt.end.line, lastPrompt.end.character), editor.document.lineAt(editor.document.lineCount - 1).range.end);
+    return new vscode.Range(new vscode.Position(lastPrompt.end.line, lastPrompt.end.character), this.editor.document.lineAt(this.editor.document.lineCount - 1).range.end);
   }
   
   delete(startIndex: number, endIndex: number) {

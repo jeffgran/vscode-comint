@@ -108,7 +108,7 @@ export class Comint {
     if (editor.document.uri.scheme !== "comint") { return; }
     
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
-    const rangeToReplace = comintBuffer.lastPromptInputRange(editor);
+    const rangeToReplace = comintBuffer.lastPromptInputRange();
     comintBuffer.decrementInputRingIndex();
     //comintBuffer.replaceRange(rangeToReplace, comintBuffer.getInputRingInput(), editor.document);
     edit.replace(rangeToReplace, comintBuffer.getInputRingInput());
@@ -119,7 +119,7 @@ export class Comint {
     if (editor.document.uri.scheme !== "comint") { return; }
     
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
-    const rangeToReplace = comintBuffer.lastPromptInputRange(editor);
+    const rangeToReplace = comintBuffer.lastPromptInputRange();
     comintBuffer.incrementInputRingIndex();
     //comintBuffer.replaceRange(rangeToReplace, comintBuffer.getInputRingInput(), editor.document);
     edit.replace(rangeToReplace, comintBuffer.getInputRingInput());
@@ -189,5 +189,19 @@ export class Comint {
         vscode.commands.executeCommand('comint.setDecorations', editor.document.uri);
       }
     });
+  };
+  
+  onDidChangeTextEditorSelection = (e: vscode.TextEditorSelectionChangeEvent) => {
+    if (e.selections.length < 1) { return; }
+    const selection = e.selections[0];
+    if (selection.isEmpty) {
+      const comintBuffer = this._memFs.getComintBuffer(e.textEditor.document.uri);
+      const prompts = comintBuffer.getPromptRanges();
+      if (prompts.length === 0) { return; }
+      const prompt = prompts[prompts.length - 1];
+      if (prompt.contains(selection)) {
+        e.textEditor.selection = new vscode.Selection(prompt.end, prompt.end);
+      }
+    }
   };
 }
