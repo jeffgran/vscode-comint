@@ -36,7 +36,8 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.inputRingPrevious', comint.inputRingPrevious));
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.inputRingNext', comint.inputRingNext));
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.clear', comint.clear));
-	
+
+	context.subscriptions.push(vscode.commands.registerTextEditorCommand('type', comint.type));
 
 	// event callbacks
 	// context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(comint.onDidChangeWorkspaceFolders));

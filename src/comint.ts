@@ -7,6 +7,10 @@ const promptDecoration = vscode.window.createTextEditorDecorationType({
   textDecoration: 'underline'
 });
 
+type TextObject = {
+  text: string
+};
+
 // TODO needs to be configurable.
 const promptRegex = /^[^#$%>\n]*[#$%>] */;
 
@@ -25,6 +29,16 @@ export class Comint {
     const num = this._shellCount;
     this._shellCount += 1;
     this._memFs.writeFile(vscode.Uri.parse(`comint:///comint:shell-${num}.sh`), Buffer.from(''), { create: true, overwrite: true });
+  };
+  
+  type = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit, { text }: TextObject) => {
+    console.log('comint.type');
+    if (editor.document.uri.scheme !== "comint") { 
+      vscode.commands.executeCommand('default:type', {text});
+      return;
+    }
+    // TODO some fancy stuff here?
+    vscode.commands.executeCommand('default:type', {text});
   };
   
   sendInput = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
