@@ -88,6 +88,10 @@ export class ComintBuffer implements vscode.FileStat {
     this._inputRingIndex = this._inputRing.length;
   }
   
+  sendChars(chars: string) {
+    this.proc?.write(chars);
+  }
+  
   getEndPosition(): vscode.Position {
     if (this.editor === undefined) {
       return new vscode.Position(0, 0);
@@ -176,10 +180,10 @@ export class ComintBuffer implements vscode.FileStat {
   _delete(startIndex: number, endIndex: number) {
     if (!this.data) { throw new Error("Tried to delete but there is no data."); }
     if (endIndex < startIndex) { throw new Error(`Invalid indices. startIndex (${startIndex}) is greater than endIndex ${endIndex}.`); }
-  
+    
     const sizeToDelete = endIndex - startIndex;
     if (sizeToDelete > this.data.length) { throw new Error(`Cannot delete more data than is in the buffer! startIndex: ${startIndex}, endIndex: ${endIndex}, buffer size: ${this.data.length}`); }
-  
+    
     // console.log(`startIndex: ${startIndex}`);
     // console.log(`endIndex: ${endIndex}`);
     // console.log(`sizeToDelete: ${sizeToDelete}`);
@@ -187,7 +191,7 @@ export class ComintBuffer implements vscode.FileStat {
     // console.log(`origLen: ${this.data.length}`);
     // console.log(`newlen: ${newlen}`);
     const newdata = new Uint8Array(newlen);
-  
+    
     const firstSlice = this.data.slice(0, startIndex);
     // console.log(`firstSlice: ${Buffer.from(firstSlice).toString('utf-8')}`);
     // console.log(`firstSlice.length: ${firstSlice.length}`);
@@ -197,7 +201,7 @@ export class ComintBuffer implements vscode.FileStat {
     // console.log(`secondSlice.length: ${secondSlice.length}`);
     // console.log(`newTotalLength: ${firstSlice.length + secondSlice.length}`);
     newdata.set(secondSlice, startIndex);
-  
+    
     console.log(`newdata: ${newdata}`);
     this.data = newdata;
   }

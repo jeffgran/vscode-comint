@@ -1,6 +1,6 @@
 {
   "name": "comint",
-  "displayName": "comint",
+  "displayName": "ComInt: Shell in a TextEditor",
   "description": "",
   "version": "0.0.1",
   "engines": {
@@ -21,6 +21,13 @@
         "when": "resourceScheme == comint",
         "key": "enter",
         "mac": "enter"
+      },
+      {
+        "command": "comint.sendCtrlC",
+        "title": "Comint Send Ctrl-C",
+        "when": "resourceScheme == comint",
+        "key": "ctrl+c ctrl+c",
+        "mac": "ctrl+c ctrl+c"
       },
       {
         "command": "comint.clear",

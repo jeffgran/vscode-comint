@@ -64,6 +64,15 @@ export class Comint {
     comintBuffer.pushInput(cmd);
   };
   
+  sendCtrlC = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
+    console.log('comint.setDecorations');
+    if (editor.document.uri.scheme !== "comint") { return; }
+    
+    const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
+
+    comintBuffer.sendChars("\x03");
+  };
+  
   setDecorations = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit, uri: vscode.Uri) => {
     console.log('comint.setDecorations');
     if (editor.document.uri.scheme !== "comint") { return; }
@@ -127,7 +136,7 @@ export class Comint {
       }
     });
   };
-
+  
   onDidOpenTextDocument = (doc: vscode.TextDocument) => {
     if (doc.uri.scheme !== "comint") { return; }
     console.log("comint.onDidOpenTextDocument");

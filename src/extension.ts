@@ -6,14 +6,10 @@ import { Comint } from './comint';
 // TODO
 // - kill the process when closing the document.
 // - cursorHome should go back to the end of the prompt if on a prompt line
+// - keep track of the insertion point so we can keep the user input if more output comes
 // - make the prompt detection more performant
 // - input ring should have an empty item at the end/beginning
 // - ANSI decorations
-//
-// - all edits must take place in the file system.
-//   X especially 'clear'
-//   - even for typing? override the letter/etc input keys?
-
 
 
 
@@ -36,6 +32,7 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.inputRingPrevious', comint.inputRingPrevious));
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.inputRingNext', comint.inputRingNext));
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.clear', comint.clear));
+	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.sendCtrlC', comint.sendCtrlC));
 
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('type', comint.type));
 
