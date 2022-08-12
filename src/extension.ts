@@ -11,7 +11,8 @@ import { Comint } from './comint';
 // - input ring should have an empty item at the end/beginning
 //   -integrate input ring with history file
 // - ANSI-color-for-comint-mode
-
+//   - first handle \r better
+// - pasword prompt
 
 const comint = new Comint();
 

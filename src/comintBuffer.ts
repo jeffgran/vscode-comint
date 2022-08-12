@@ -35,7 +35,7 @@ export class ComintBuffer implements vscode.FileStat {
     console.log('startComint');
     this.editor = editor;
     
-    this.proc = spawn("/opt/homebrew/bin/bash", ["-c", "bind 'set enable-bracketed-paste off' 2>/dev/null; /opt/homebrew/bin/bash"], {
+    this.proc = spawn("/bin/bash", ["-c", "bind 'set enable-bracketed-paste off' 2>/dev/null; /opt/homebrew/bin/bash"], {
       name: 'xterm-color',
       cols: 80,
       rows: 30,
