@@ -1,6 +1,5 @@
 import { MemFS } from './fileSystemProvider';
 import * as vscode from 'vscode';
-import { ComintBuffer } from './comintBuffer';
 
 // decorations
 const promptDecoration = vscode.window.createTextEditorDecorationType({
@@ -69,7 +68,7 @@ export class Comint {
     if (editor.document.uri.scheme !== "comint") { return; }
     
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
-
+    
     comintBuffer.sendChars("\x03");
   };
   

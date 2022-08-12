@@ -39,7 +39,7 @@ export class ComintBuffer implements vscode.FileStat {
       name: 'xterm-color',
       cols: 80,
       rows: 30,
-      cwd: process.env.HOME,
+      cwd: this._rootPath(),
       env: process.env
     });
     
@@ -204,5 +204,10 @@ export class ComintBuffer implements vscode.FileStat {
     
     console.log(`newdata: ${newdata}`);
     this.data = newdata;
+  }
+
+  _rootPath() {
+    if (!vscode.workspace.workspaceFolders) { return process.env.HOME; }
+    return vscode.workspace.workspaceFolders![0].uri.path;
   }
 }

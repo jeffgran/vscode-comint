@@ -12,7 +12,6 @@ import { Comint } from './comint';
 // - ANSI decorations
 
 
-
 const comint = new Comint();
 
 export function activate(context: vscode.ExtensionContext) {
