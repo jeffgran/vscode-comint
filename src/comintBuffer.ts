@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import {IPty, spawn} from 'node-pty';
 import { MemFS } from './fileSystemProvider';
+import { OutputFilterFunctions } from './outputFilterFunctions';
 
 export class ComintBuffer implements vscode.FileStat {
   
@@ -16,6 +17,8 @@ export class ComintBuffer implements vscode.FileStat {
   data?: Uint8Array;
   proc?: IPty;
   promptRanges: vscode.Range[];
+  outputFilterFunctions: OutputFilterFunctions;
+
   _inputRing: string[];
   _inputRingIndex: number = 0;
   
@@ -29,6 +32,7 @@ export class ComintBuffer implements vscode.FileStat {
     this._inputRing = [];
     this.uri = uri;
     this._memFs = memFs;
+    this.outputFilterFunctions = new OutputFilterFunctions();
   }
   
   startComint(uri: vscode.Uri, editor: vscode.TextEditor) {
@@ -51,16 +55,22 @@ export class ComintBuffer implements vscode.FileStat {
     this.proc.onData((data: string) => {
       try {
         //console.log('[proc.onData] this.data.length', this.data?.length);
-        //console.log('[proc.onData] new data:', data);
+        console.log('[proc.onData] new data:', data.toString().replace(/\r/g, "/r").replace(/\n/g, "/n\n"));
         
-        const databuffer = Buffer.from(data).filter(c => c !== 13); // strip out CR for now
+        const databuffer = Buffer.from(data);
+        const filteredDataBuffer = this.outputFilterFunctions.filter(databuffer);
+        
         const oldLength = this.data?.length || 0;
         // console.log('[proc.onData] incomingdata.length', databuffer.length);
-        const newdata = new Uint8Array(oldLength + databuffer.length);
+        const newdata = new Uint8Array(oldLength + filteredDataBuffer.length);
         newdata.set(this.data || Buffer.from(''), 0);
-        newdata.set(databuffer, oldLength);
+        newdata.set(filteredDataBuffer, oldLength);
         // console.log('[proc.onData] newdata.length', newdata.length);
         // console.log('newdata', Buffer.from(newdata).toJSON().data.toString());
+        
+        
+        
+        
         this._sync(newdata, true);
       } catch(e) {
         console.log(e);
@@ -121,7 +131,7 @@ export class ComintBuffer implements vscode.FileStat {
     if (this.editor === undefined) {
       throw new Error('No Editor!');
     }
-
+    
     const ranges = this.getPromptRanges();
     if (ranges.length === 0) {
       return this.editor.selection;
@@ -209,7 +219,7 @@ export class ComintBuffer implements vscode.FileStat {
     console.log(`newdata: ${newdata}`);
     this.data = newdata;
   }
-
+  
   _rootPath() {
     if (!vscode.workspace.workspaceFolders) { return process.env.HOME; }
     return vscode.workspace.workspaceFolders![0].uri.path;

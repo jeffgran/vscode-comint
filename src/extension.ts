@@ -1,6 +1,4 @@
-import { text } from 'stream/consumers';
 import * as vscode from 'vscode';
-import { MemFS } from './fileSystemProvider';
 import { Comint } from './comint';
 
 // TODO
