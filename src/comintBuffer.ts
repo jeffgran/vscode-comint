@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import {IPty, spawn} from 'node-pty';
 import { MemFS } from './fileSystemProvider';
-import { OutputFilterFunctions } from './outputFilterFunctions';
+import { CursorMovement } from './outputFilterFunctions';
 
 export class ComintBuffer implements vscode.FileStat {
   
@@ -17,8 +17,8 @@ export class ComintBuffer implements vscode.FileStat {
   data?: Uint8Array;
   proc?: IPty;
   promptRanges: vscode.Range[];
-  outputFilterFunctions: OutputFilterFunctions;
-
+  cursorMovement: CursorMovement;
+  
   _inputRing: string[];
   _inputRingIndex: number = 0;
   
@@ -32,7 +32,7 @@ export class ComintBuffer implements vscode.FileStat {
     this._inputRing = [];
     this.uri = uri;
     this._memFs = memFs;
-    this.outputFilterFunctions = new OutputFilterFunctions();
+    this.cursorMovement = new CursorMovement();
   }
   
   startComint(uri: vscode.Uri, editor: vscode.TextEditor) {
@@ -58,18 +58,7 @@ export class ComintBuffer implements vscode.FileStat {
         console.log('[proc.onData] new data:', data.toString().replace(/\r/g, "/r").replace(/\n/g, "/n\n"));
         
         const databuffer = Buffer.from(data);
-        const filteredDataBuffer = this.outputFilterFunctions.filter(databuffer);
-        
-        const oldLength = this.data?.length || 0;
-        // console.log('[proc.onData] incomingdata.length', databuffer.length);
-        const newdata = new Uint8Array(oldLength + filteredDataBuffer.length);
-        newdata.set(this.data || Buffer.from(''), 0);
-        newdata.set(filteredDataBuffer, oldLength);
-        // console.log('[proc.onData] newdata.length', newdata.length);
-        // console.log('newdata', Buffer.from(newdata).toJSON().data.toString());
-        
-        
-        
+        const newdata = this.cursorMovement.applyChunk(this.data || Buffer.from(''), databuffer);
         
         this._sync(newdata, true);
       } catch(e) {
