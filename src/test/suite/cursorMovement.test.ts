@@ -19,7 +19,7 @@ suite('CursorMovement #filter', () => {
 		const cm = new CursorMovement();
 		const input1 = "Pictures\r";
 		const input2 = "\r\nPublic\r\n";
-
+		
 		const output1 = cm.filter(Buffer.from(input1));
 		assert.equal(cm.inSlashR, true);
 		assert.deepEqual(cm.writePosition, [-1, -1]);
@@ -29,7 +29,7 @@ suite('CursorMovement #filter', () => {
 		assert.equal(cm.inSlashR, false);
 		assert.deepEqual(cm.writePosition, [-1, -1]);
 		assert.equal(output2.toString(), '\nPublic\n');
-
+		
 		const finaloutput = output1.toString() + output2.toString();
 		assert.deepEqual(finaloutput, "Pictures\nPublic\n");
 	});
@@ -42,7 +42,7 @@ suite('CursorMovement #filter', () => {
 		const input3 = ' 2.12GiB 0:00:03 [ 714MiB/s] [========================>         ] 75% ETA 0:00:00\r';
 		const input4 = ' 2.73GiB 0:00:04 [ 624MiB/s] [===============================>  ] 97% ETA 0:00:00\r';
 		const input5 = ' 2.79GiB 0:00:04 [ 699MiB/s] [================================>] 100%            \r\r\n';
-
+		
 		const output1 = cm.filter(Buffer.from(input1));
 		assert.equal(cm.inSlashR, true);
 		assert.deepEqual(cm.writePosition, [-1, -1]);
@@ -67,7 +67,7 @@ suite('CursorMovement #filter', () => {
 		assert.equal(cm.inSlashR, false);
 		assert.deepEqual(cm.writePosition, [-1, 0]);
 		assert.deepEqual(output5.toString(), ' 2.79GiB 0:00:04 [ 699MiB/s] [================================>] 100%            \n');
-
+		
 		const output6 = cm.filter(Buffer.from('next prompt >'));
 		assert.equal(cm.inSlashR, false);
 		assert.deepEqual(cm.writePosition, [-1, -1]);
@@ -83,7 +83,7 @@ suite('CursorMovement #applyChunk', () => {
 		const input3 = ' 2.12GiB 0:00:03 [ 714MiB/s] [========================>         ] 75% ETA 0:00:00\r';
 		const input4 = ' 2.73GiB 0:00:04 [ 624MiB/s] [===============================>  ] 97% ETA 0:00:00\r';
 		const input5 = ' 2.79GiB 0:00:04 [ 699MiB/s] [================================>] 100%            \r\r\n';
-
+		
 		const output1 = cm.applyChunk(Buffer.from(''), Buffer.from(input1));
 		assert.equal(cm.inSlashR, true);
 		assert.deepEqual(cm.writePosition, [-1, -1]);
@@ -108,10 +108,27 @@ suite('CursorMovement #applyChunk', () => {
 		assert.equal(cm.inSlashR, false);
 		assert.deepEqual(cm.writePosition, [-1, 0]);
 		assert.deepEqual(Buffer.from(output5).toString(), ' 2.79GiB 0:00:04 [ 699MiB/s] [================================>] 100%            \n');
-
+		
 		const output6 = cm.applyChunk(output5, Buffer.from('next prompt >'));
 		assert.equal(cm.inSlashR, false);
 		assert.deepEqual(cm.writePosition, [-1, -1]);
 		assert.deepEqual(Buffer.from(output6).toString(), ' 2.79GiB 0:00:04 [ 699MiB/s] [================================>] 100%            \nnext prompt >');
+	});
+	
+	test('/r with partial line', () => {
+		const cm = new CursorMovement();
+
+		const input1 = 'password\rsafe';
+		const input2 = 'ty first!\r\n';
+	
+		const output1 = cm.applyChunk(Buffer.from(''), Buffer.from(input1));
+		assert.equal(cm.inSlashR, false);
+		assert.deepEqual(cm.nextWritePosition, [-1, -5]);
+		assert.deepEqual(Buffer.from(output1).toString(), 'safeword');
+		
+		const output2 = cm.applyChunk(output1, Buffer.from(input2));
+		assert.equal(cm.inSlashR, false);
+		assert.deepEqual(cm.nextWritePosition, [-1, -1]);
+		assert.deepEqual(Buffer.from(output2).toString(), 'safety first!\n');	
 	});
 });
