@@ -1,8 +1,20 @@
+import { write } from "fs";
+
+export type SgrSegment = {
+  code: number,
+  startIndex: number,
+  endIndex: number,
+};
+
+const tokenRe = /(\x1b\[[0-9]*[ABCDEFGJKST]|\x1b\[\?25[hl]|\x1b\[(?<code>[0-9]*;?)+m|\r+\n?|.)/g;
 
 export class CursorMovement {
   inSlashR: boolean = false;
+  killLine: boolean = false;
   writePosition: number[] = [-1, -1];
   nextWritePosition: number[] = [-1, -1];
+  openSgrSegments: SgrSegment[] = [];
+  sgrSegments: SgrSegment[] = [];
   
   applyChunk(fileData: Uint8Array, chunk: Uint8Array): Uint8Array {
     const filteredChunk = this.filter(chunk);
@@ -20,7 +32,7 @@ export class CursorMovement {
         // find last (nth) newline where n = 0 - wp[0]
         // write head is that + wp[1]
         // e.g. [-1, 0]: nth newline = 0 - -1 => 1
-        const nthLastNewlineIndex = 0 - this.writePosition[0]; // 1 for now. TODO: nth lookup?
+        // const nthLastNewlineIndex = 0 - this.writePosition[0]; // 1 for now. TODO: nth lookup?
         writeAtIndex = fileData.lastIndexOf(10) + 1; // 10 === \n
       }
     } else {
@@ -36,7 +48,10 @@ export class CursorMovement {
       writeAtIndex = writeAtIndex + (this.writePosition[1]);
     }
     
-    
+    this.sgrSegments.forEach(s => {
+      s.startIndex += writeAtIndex;
+      s.endIndex += writeAtIndex;
+    });
     
     
     // figure out how much the array needs to be expanded by, if any
@@ -45,16 +60,27 @@ export class CursorMovement {
     
     
     if (writeHeadroom >= filteredChunk.length) {
-      fileData.set(filteredChunk, writeAtIndex);
       if (writeHeadroom > filteredChunk.length) {
         // if we won't end at the _end_ of the final data,
         // we have to keep track of where to start from next time.
         this.writePosition[1] += writeHeadroom - filteredChunk.length;
       }
-      return fileData;
+
+      if (this.killLine) {
+        const diff = writeHeadroom - filteredChunk.length;
+        if (diff > 0) {}
+        const returnData = new Uint8Array(fileData.length - diff);
+        returnData.set(fileData.slice(0, fileData.length - diff), 0);
+        returnData.set(filteredChunk, writeAtIndex);
+        return returnData;
+      } else {
+        fileData.set(filteredChunk, writeAtIndex);
+        return fileData;
+      }
     } else {
       // new expanded buffer
-      const returnData = new Uint8Array(fileData.length + (filteredChunk.length - writeHeadroom));
+      const diff = filteredChunk.length - writeHeadroom;
+      const returnData = new Uint8Array(fileData.length + diff);
       returnData.set(fileData, 0);
       returnData.set(filteredChunk, writeAtIndex);
       return returnData;
@@ -66,40 +92,63 @@ export class CursorMovement {
     this.writePosition = this.nextWritePosition;
     this.nextWritePosition = [-1, -1];
     let lastNewlineIndex = -1;
-    
     let filteredBuffer: number[] = [];
     let outputWriteIndex = 0;
-    input.forEach((v, i) => {
-      if (v === 8) { // Backspace
-        this.inSlashR = false;
+    this.sgrSegments = [];
+    this.killLine = false;
+    let token: RegExpExecArray | null;
+    const inputString = input.toString();
+
+
+    while((token = tokenRe.exec(inputString)) !== null) {
+      //console.log(`token: ${token[0]}`, Buffer.from(token[0]));
+      if (token[0] === '\b') {
         if (outputWriteIndex > 0) {
-          //filteredBuffer.splice(filteredBuffer.length - 1);
           outputWriteIndex = outputWriteIndex - 1;
         } else {
           this.writePosition[1] = this.writePosition[1] - 1;
         }
-      } else if (v === 10) { // Newline
+      } else if (token[0].endsWith('\n')) { // \r*\n
         this.inSlashR = false;
         if (outputWriteIndex === filteredBuffer.length) {
-          filteredBuffer.push(v);
+          filteredBuffer.push(10);
         } else {
-          filteredBuffer[outputWriteIndex] = v;
+          filteredBuffer[outputWriteIndex] = 10;
         }
         outputWriteIndex = outputWriteIndex + 1;
         lastNewlineIndex = outputWriteIndex;
-      } else if (v === 13) { // Carriage Return
-        if (input[i+1] === 10 || input[i+1] === 13 || this.inSlashR || i === input.length - 1) {
-          // nothing
+      } else if (token[0].endsWith('\r')) {
+        if (token.index + token[0].length === inputString.length) {
+          this.inSlashR = true;
         } else if (lastNewlineIndex >= 0) {
-          //filteredBuffer.splice(lastNewlineIndex);
           outputWriteIndex = lastNewlineIndex;
           outputWriteIndex += 1;
         } else {
           this.writePosition = [-1, 0];
           outputWriteIndex = 0;
         }
-        this.inSlashR = true;
-      } else {
+      } else if (token[0] === '\x1b\[K') { // 'kill to end of line' code
+        filteredBuffer.splice(outputWriteIndex);
+        this.killLine = true;
+      } else if (token[0].length > 1 && token[0][0] === '\x1b' && token[0].endsWith('m')) {
+        const sgrcode = token.groups!.code;
+        if (sgrcode === '0' || sgrcode === '') {
+          this.openSgrSegments.forEach(s => {
+            s.endIndex = outputWriteIndex - 1;
+            this.sgrSegments.push(s);
+          });
+          this.openSgrSegments = [];
+        } else {
+          this.openSgrSegments.push({
+            code: parseInt(sgrcode, 10),
+            startIndex: outputWriteIndex,
+            endIndex: outputWriteIndex - 1
+          });
+        }
+        this.inSlashR = false;
+      } else if (token[0].startsWith('\x1b[')) {
+        // other ANSI codes, ignore for now
+      } else { // any other character
         if (this.inSlashR) {
           if (lastNewlineIndex >= 0) {
             outputWriteIndex = lastNewlineIndex + 1;
@@ -109,14 +158,15 @@ export class CursorMovement {
           }
         }
         if (outputWriteIndex === filteredBuffer.length) {
-          filteredBuffer.push(v);
+          filteredBuffer.push(token[0].charCodeAt(0));
         } else {
-          filteredBuffer[outputWriteIndex] = v;
+          filteredBuffer[outputWriteIndex] = token[0].charCodeAt(0);
         }
         outputWriteIndex += 1;
         this.inSlashR = false;
       }
-    });
+    }
+
     if (outputWriteIndex < filteredBuffer.length) {
       this.nextWritePosition[1] -= filteredBuffer.length - outputWriteIndex;
     }

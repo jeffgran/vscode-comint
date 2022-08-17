@@ -1,7 +1,7 @@
 import * as vscode from 'vscode';
 import {IPty, spawn} from 'node-pty';
 import { MemFS } from './fileSystemProvider';
-import { CursorMovement } from './outputFilterFunctions';
+import { CursorMovement, SgrSegment } from './outputFilterFunctions';
 
 export class ComintBuffer implements vscode.FileStat {
   
@@ -18,6 +18,8 @@ export class ComintBuffer implements vscode.FileStat {
   proc?: IPty;
   promptRanges: vscode.Range[];
   cursorMovement: CursorMovement;
+
+  sgrSegments: SgrSegment[] = [];
   
   _inputRing: string[];
   _inputRingIndex: number = 0;
@@ -50,15 +52,15 @@ export class ComintBuffer implements vscode.FileStat {
     // TODO more general/configurable solution for these extras to set the shell up right
     this.proc.write("stty -echo\n");
     
-    let thenable: Thenable<undefined>;
-    
     this.proc.onData((data: string) => {
       try {
         //console.log('[proc.onData] this.data.length', this.data?.length);
-        console.log('[proc.onData] new data:', data.toString().replace(/\r/g, "/r").replace(/\n/g, "/n\n"));
+        console.log('[proc.onData] new data:', data.replace(/\r/g, "/r").replace(/\n/g, "/n\n"));
+        console.log('[proc.onData] new data raw:', Buffer.from(data));
         
         const databuffer = Buffer.from(data);
         const newdata = this.cursorMovement.applyChunk(this.data || Buffer.from(''), databuffer);
+        this.sgrSegments.push(...this.cursorMovement.sgrSegments);
         
         this._sync(newdata, true);
       } catch(e) {

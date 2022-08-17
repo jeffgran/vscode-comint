@@ -73,6 +73,18 @@ suite('CursorMovement #filter', () => {
 		assert.deepEqual(cm.writePosition, [-1, -1]);
 		assert.deepEqual(output6.toString(), 'next prompt >');
 	});
+	
+	test('simple SGR', () => {
+		const cm = new CursorMovement();
+		const input = 'these \x1b[32mgreen\x1b[0m and \x1b[31mred\x1b[m words';
+		const output = cm.filter(Buffer.from(input));
+		//assert.deepEqual(output.toString(), 'these green and red words');
+		assert.deepEqual(cm.openSgrSegments, []);
+		assert.deepEqual(cm.sgrSegments, [
+			{ code: 32, startIndex: 6, endIndex: 10 },
+			{ code: 31, startIndex: 16, endIndex: 18 }
+		]);
+	});
 });
 
 suite('CursorMovement #applyChunk', () => {
@@ -117,10 +129,10 @@ suite('CursorMovement #applyChunk', () => {
 	
 	test('/r with partial line', () => {
 		const cm = new CursorMovement();
-
+		
 		const input1 = 'password\rsafe';
 		const input2 = 'ty first!\r\n';
-	
+		
 		const output1 = cm.applyChunk(Buffer.from(''), Buffer.from(input1));
 		assert.equal(cm.inSlashR, false);
 		assert.deepEqual(cm.nextWritePosition, [-1, -5]);
@@ -130,5 +142,24 @@ suite('CursorMovement #applyChunk', () => {
 		assert.equal(cm.inSlashR, false);
 		assert.deepEqual(cm.nextWritePosition, [-1, -1]);
 		assert.deepEqual(Buffer.from(output2).toString(), 'safety first!\n');	
+	});
+	
+	test ('/r and ESC[K to kill line (npm)', () => {
+		const cm = new CursorMovement();
+		const input1 = '[\x1b[100;90m..................\x1b[0m] \ reify: \x1b[43;40mtiming\x1b[0m \x1b[35marborist:longer-name\x1b[0m Completed in 0ms\x1b[0m\x1b[K\r';
+		const output1 = cm.applyChunk(Buffer.from(''), Buffer.from(input1));
+		assert.deepEqual(Buffer.from(output1).toString(), '[..................] \ reify: timing arborist:longer-name Completed in 0ms');
+		
+		const input2 = '[\x1b[107;97m#########\x1b[0m\x1b[100;90m.........\x1b[0m] \ idealTree: \x1b[43;40mtiming\x1b[0m \x1b[35midealTree\x1b[0m Completed in 80ms\x1b[0m\x1b[K\r';
+		const output2 = cm.applyChunk(output1, Buffer.from(input2));
+		assert.deepEqual(Buffer.from(output2).toString(), '[#########.........] \ idealTree: timing idealTree Completed in 80ms');
+
+		const input3 = '\r\x1b[K\x1b[?25h';
+		const output3 = cm.applyChunk(output2, Buffer.from(input3));
+		assert.deepEqual(Buffer.from(output3).toString(), '');
+		
+		const input4 = '\r\nup to date.';
+		const output4 = cm.applyChunk(output3, Buffer.from(input4));
+		assert.deepEqual(Buffer.from(output4).toString(), '\nup to date.');
 	});
 });

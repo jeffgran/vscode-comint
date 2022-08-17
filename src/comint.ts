@@ -6,6 +6,14 @@ const promptDecoration = vscode.window.createTextEditorDecorationType({
   textDecoration: 'underline'
 });
 
+const ansiRedDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiRed'),
+});
+
+const ansiGreenDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiGreen'),
+});
+
 type TextObject = {
   text: string
 };
@@ -83,6 +91,12 @@ export class Comint {
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const ranges = comintBuffer.getPromptRanges();
     editor.setDecorations(promptDecoration, ranges);
+    
+    const sgrSegments = comintBuffer.sgrSegments;
+    const sgrRanges = sgrSegments.map(s => {
+      return new vscode.Range(editor.document.positionAt(s.startIndex), editor.document.positionAt(s.endIndex));
+    });
+    editor.setDecorations(ansiGreenDecoration, sgrRanges);
   };
   
   stickyBottom = (editor: vscode.TextEditor, _edit: vscode.TextEditorEdit, uri: vscode.Uri) => {
