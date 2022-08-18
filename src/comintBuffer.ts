@@ -1,6 +1,5 @@
 import * as vscode from 'vscode';
 import {IPty, spawn} from 'node-pty';
-import { MemFS } from './fileSystemProvider';
 import { Token, tokenRe } from './token';
 
 export type SgrSegment = {
@@ -9,32 +8,29 @@ export type SgrSegment = {
   endIndex: number,
 };
 
-
 export class ComintBuffer implements vscode.FileStat {
-  
   type: vscode.FileType;
   ctime: number;
   mtime: number;
   size: number;
   uri: vscode.Uri;
-  _memFs: MemFS;
   editor?: vscode.TextEditor;
   
   name: string;
-  data?: Uint8Array;
+  data: Uint8Array = Buffer.from('');
   proc?: IPty;
   promptRanges: vscode.Range[];
-
+  
   inCR: boolean = false;
   openSgrSegments: SgrSegment[] = [];
   writeIndex: number = 0;
-
+  
   sgrSegments: SgrSegment[] = [];
   
   _inputRing: string[];
   _inputRingIndex: number = 0;
   
-  constructor(name: string, uri: vscode.Uri, memFs: MemFS) {
+  constructor(name: string, uri: vscode.Uri) {
     this.type = vscode.FileType.File;
     this.ctime = Date.now();
     this.mtime = Date.now();
@@ -43,7 +39,6 @@ export class ComintBuffer implements vscode.FileStat {
     this.promptRanges = [];
     this._inputRing = [];
     this.uri = uri;
-    this._memFs = memFs;
   }
   
   startComint(uri: vscode.Uri, editor: vscode.TextEditor) {
@@ -61,41 +56,29 @@ export class ComintBuffer implements vscode.FileStat {
     // TODO more general/configurable solution for these extras to set the shell up right
     this.proc.write("stty -echo\n");
     
-    this.proc.onData((data: string) => {
-      try {
-        //console.log('[proc.onData] this.data.length', this.data?.length);
-        console.log('[proc.onData] new data:', data.replace(/\r/g, "/r").replace(/\n/g, "/n\n"));
-        console.log('[proc.onData] new data raw:', Buffer.from(data));
-        
-        const databuffer = Buffer.from(data);
-        const newdata = this.applyChunk(this.data || Buffer.from(''), databuffer);
-        
-        this._sync(newdata, true);
-      } catch(e) {
-        console.log(e);
-      }
-    });
+    this.proc.onData(this.applyChunk.bind(this));
   }
-
-  applyChunk(fileData: Uint8Array, chunk: Uint8Array): Uint8Array {
-    const chunkString = chunk.toString();
-    let match: RegExpExecArray | null;
+  
+  applyChunk(chunkString: string) {
+    // console.log('[proc.onData] new data:', chunkString.replace(/\r/g, "/r").replace(/\n/g, "/n\n"));
+    // console.log('[proc.onData] new data raw:', Buffer.from(chunkString));
     
+    let match: RegExpExecArray | null;
     
     while((match = tokenRe.exec(chunkString)) !== null) {
       const token = new Token(match);
       //console.log(`token: ${token[0]}`, Buffer.from(token[0]));
       if (token.isCrlfSequence()) {
         this.inCR = false;
-        fileData = this.write(token.outputCharCodes(), fileData);
+        this.data = this.write(token.outputCharCodes(), this.data!);
       } else if (token.isCrSequence()) {
         if (token.endIndex === chunkString.length - 1) {
           this.inCR = true;
         } else {
-          this.writeIndex = fileData.lastIndexOf(10) + 1;
+          this.writeIndex = this.data!.lastIndexOf(10) + 1;
         }
       } else if (token.isKillLine()) {
-        fileData = this.splice(fileData, this.writeIndex - 1, fileData.length - 1);
+        this.data = this.splice(this.data!, this.writeIndex - 1, this.data!.length - 1);
       } else if (token.isSgrCode()) {
         this.processSgrCodes(token);
         this.inCR = false;
@@ -103,16 +86,16 @@ export class ComintBuffer implements vscode.FileStat {
         // other ANSI codes, ignore for now
       } else { // any other character
         if (this.inCR) {
-          this.writeIndex = fileData.lastIndexOf(10) + 1;
+          this.writeIndex = this.data!.lastIndexOf(10) + 1;
         }
-        fileData = this.write(token.outputCharCodes(), fileData);
+        this.data = this.write(token.outputCharCodes(), this.data!);
         this.inCR = false;
       }
     }
     
-    return fileData;
+    this._sync(this.data!, true);
   }
-
+  
   write(value: Uint8Array, to: Uint8Array): Uint8Array {
     const headroom = to.length - this.writeIndex;
     if (headroom >= value.length) {
@@ -220,7 +203,6 @@ export class ComintBuffer implements vscode.FileStat {
   
   delete(startIndex: number, endIndex: number) {
     this._delete(startIndex, endIndex);
-    //this._memFs.writeFile(this.uri, this.data!, {create: false, overwrite: true});
     this._sync(this.data!, true);
   }
   
@@ -244,7 +226,7 @@ export class ComintBuffer implements vscode.FileStat {
   // }
   
   _sync(data: Uint8Array, revert: boolean = false) {
-    this._memFs.writeFile(this.uri, data, {create: false, overwrite: false});
+    this.data = data;
     if (revert) {
       // after writing to the underlying virtual file/buffer, immediately 
       // "revert" the textdocument, so it reflects the new data, and doesn't show as "unsaved"

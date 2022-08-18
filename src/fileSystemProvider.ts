@@ -72,7 +72,7 @@ export class MemFS implements vscode.FileSystemProvider {
             throw vscode.FileSystemError.FileExists(uri);
         }
         if (!entry) {
-            entry = new ComintBuffer(basename, uri, this);
+            entry = new ComintBuffer(basename, uri);
             parent.entries.set(basename, entry);
             console.log("created file!");
             this._fireSoon({ type: vscode.FileChangeType.Created, uri });
