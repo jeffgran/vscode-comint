@@ -3,11 +3,12 @@ import * as assert from 'assert';
 // You can import and use all API from the 'vscode' module
 // as well as import your extension to test it
 import * as vscode from 'vscode';
-import { CursorMovement } from '../../outputFilterFunctions';
+import { ComintBuffer } from '../../comintBuffer';
+import { MemFS } from '../../fileSystemProvider';
 
-suite('CursorMovement #applyChunk', () => {
+suite('ComintBuffer #applyChunk', () => {
 	test('pv', () => {
-		const cm = new CursorMovement();
+		const cm = new ComintBuffer('name', vscode.Uri.parse('comint:/'), new MemFS());
 		const input1 = '  720MiB 0:00:01 [ 720MiB/s] [=======>                          ] 25% ETA 0:00:02\r';
 		const input2 = ' 1.43GiB 0:00:02 [ 739MiB/s] [================>                 ] 51% ETA 0:00:01\r';
 		const input3 = ' 2.12GiB 0:00:03 [ 714MiB/s] [========================>         ] 75% ETA 0:00:00\r';
@@ -40,7 +41,7 @@ suite('CursorMovement #applyChunk', () => {
 	});
 	
 	test('/r with partial line', () => {
-		const cm = new CursorMovement();
+		const cm = new ComintBuffer('name', vscode.Uri.parse('comint:/'), new MemFS());
 		
 		const input1 = 'password\rsafe';
 		const input2 = 'ty first!\r\n';
@@ -55,7 +56,7 @@ suite('CursorMovement #applyChunk', () => {
 	});
 	
 	test ('/r and ESC[K to kill line (npm)', () => {
-		const cm = new CursorMovement();
+		const cm = new ComintBuffer('name', vscode.Uri.parse('comint:/'), new MemFS());
 		const input1 = '[\x1b[100;90m..................\x1b[0m] \ reify: \x1b[43;40mtiming\x1b[0m \x1b[35marborist:longer-name\x1b[0m Completed in 0ms\x1b[0m\x1b[K\r';
 		const output1 = cm.applyChunk(Buffer.from(''), Buffer.from(input1));
 		assert.deepEqual(Buffer.from(output1).toString(), '[..................] \ reify: timing arborist:longer-name Completed in 0ms');

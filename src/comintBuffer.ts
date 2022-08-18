@@ -1,7 +1,14 @@
 import * as vscode from 'vscode';
 import {IPty, spawn} from 'node-pty';
 import { MemFS } from './fileSystemProvider';
-import { CursorMovement, SgrSegment } from './outputFilterFunctions';
+import { Token, tokenRe } from './token';
+
+export type SgrSegment = {
+  code: number,
+  startIndex: number,
+  endIndex: number,
+};
+
 
 export class ComintBuffer implements vscode.FileStat {
   
@@ -17,7 +24,10 @@ export class ComintBuffer implements vscode.FileStat {
   data?: Uint8Array;
   proc?: IPty;
   promptRanges: vscode.Range[];
-  cursorMovement: CursorMovement;
+
+  inCR: boolean = false;
+  openSgrSegments: SgrSegment[] = [];
+  writeIndex: number = 0;
 
   sgrSegments: SgrSegment[] = [];
   
@@ -34,7 +44,6 @@ export class ComintBuffer implements vscode.FileStat {
     this._inputRing = [];
     this.uri = uri;
     this._memFs = memFs;
-    this.cursorMovement = new CursorMovement();
   }
   
   startComint(uri: vscode.Uri, editor: vscode.TextEditor) {
@@ -59,12 +68,90 @@ export class ComintBuffer implements vscode.FileStat {
         console.log('[proc.onData] new data raw:', Buffer.from(data));
         
         const databuffer = Buffer.from(data);
-        const newdata = this.cursorMovement.applyChunk(this.data || Buffer.from(''), databuffer);
-        this.sgrSegments.push(...this.cursorMovement.sgrSegments);
+        const newdata = this.applyChunk(this.data || Buffer.from(''), databuffer);
         
         this._sync(newdata, true);
       } catch(e) {
         console.log(e);
+      }
+    });
+  }
+
+  applyChunk(fileData: Uint8Array, chunk: Uint8Array): Uint8Array {
+    const chunkString = chunk.toString();
+    let match: RegExpExecArray | null;
+    
+    
+    while((match = tokenRe.exec(chunkString)) !== null) {
+      const token = new Token(match);
+      //console.log(`token: ${token[0]}`, Buffer.from(token[0]));
+      if (token.isCrlfSequence()) {
+        this.inCR = false;
+        fileData = this.write(token.outputCharCodes(), fileData);
+      } else if (token.isCrSequence()) {
+        if (token.endIndex === chunkString.length - 1) {
+          this.inCR = true;
+        } else {
+          this.writeIndex = fileData.lastIndexOf(10) + 1;
+        }
+      } else if (token.isKillLine()) {
+        fileData = this.splice(fileData, this.writeIndex - 1, fileData.length - 1);
+      } else if (token.isSgrCode()) {
+        this.processSgrCodes(token);
+        this.inCR = false;
+      } else if (token.isAnsiCode()) {
+        // other ANSI codes, ignore for now
+      } else { // any other character
+        if (this.inCR) {
+          this.writeIndex = fileData.lastIndexOf(10) + 1;
+        }
+        fileData = this.write(token.outputCharCodes(), fileData);
+        this.inCR = false;
+      }
+    }
+    
+    return fileData;
+  }
+
+  write(value: Uint8Array, to: Uint8Array): Uint8Array {
+    const headroom = to.length - this.writeIndex;
+    if (headroom >= value.length) {
+      // there's enough room, just write it
+      to.set(value, this.writeIndex);
+      this.writeIndex += value.length;
+      return to;
+    } else {
+      // there's not enough room, make a bigger array and then write it
+      const ret = new Uint8Array(to.length + (value.length - headroom));
+      ret.set(to, 0);
+      ret.set(value, this.writeIndex);
+      this.writeIndex = ret.length;
+      return ret;
+    }
+  }
+  
+  splice(from: Uint8Array, start: number, end: number): Uint8Array {
+    const ret = new Uint8Array(from.length - (end - start));
+    ret.set(from.slice(0, start+1), 0);
+    ret.set(from.slice(end+1, from.length), start+1);
+    return ret;
+  }
+  
+  processSgrCodes(token: Token) {
+    const sgrcodes = token.sgrCodes();
+    sgrcodes?.forEach(sgrcode => {
+      if (sgrcode === 0) {
+        this.openSgrSegments.forEach(s => {
+          s.endIndex = this.writeIndex;
+          this.sgrSegments.push(s);
+        });
+        this.openSgrSegments = [];
+      } else {
+        this.openSgrSegments.push({
+          code: sgrcode,
+          startIndex: this.writeIndex,
+          endIndex: this.writeIndex
+        });
       }
     });
   }
