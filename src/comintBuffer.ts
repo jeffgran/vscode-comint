@@ -70,7 +70,7 @@ export class ComintBuffer implements vscode.FileStat {
       //console.log(`token: ${token[0]}`, Buffer.from(token[0]));
       if (token.isCrlfSequence()) {
         this.inCR = false;
-        this.data = this.write(token.outputCharCodes(), this.data!);
+        this.writeIndex = this.write(token.outputCharCodes(), this.writeIndex);
       } else if (token.isCrSequence()) {
         if (token.endIndex === chunkString.length - 1) {
           this.inCR = true;
@@ -78,7 +78,9 @@ export class ComintBuffer implements vscode.FileStat {
           this.writeIndex = this.data!.lastIndexOf(10) + 1;
         }
       } else if (token.isKillLine()) {
-        this.data = this.splice(this.data!, this.writeIndex - 1, this.data!.length - 1);
+        if (this.writeIndex !== this.data.length) {
+          this.delete(this.writeIndex, this.data.length - 1);
+        }
       } else if (token.isSgrCode()) {
         this.processSgrCodes(token);
         this.inCR = false;
@@ -88,36 +90,12 @@ export class ComintBuffer implements vscode.FileStat {
         if (this.inCR) {
           this.writeIndex = this.data!.lastIndexOf(10) + 1;
         }
-        this.data = this.write(token.outputCharCodes(), this.data!);
+        this.writeIndex = this.write(token.outputCharCodes(), this.writeIndex);
         this.inCR = false;
       }
     }
     
-    this._sync(this.data!, true);
-  }
-  
-  write(value: Uint8Array, to: Uint8Array): Uint8Array {
-    const headroom = to.length - this.writeIndex;
-    if (headroom >= value.length) {
-      // there's enough room, just write it
-      to.set(value, this.writeIndex);
-      this.writeIndex += value.length;
-      return to;
-    } else {
-      // there's not enough room, make a bigger array and then write it
-      const ret = new Uint8Array(to.length + (value.length - headroom));
-      ret.set(to, 0);
-      ret.set(value, this.writeIndex);
-      this.writeIndex = ret.length;
-      return ret;
-    }
-  }
-  
-  splice(from: Uint8Array, start: number, end: number): Uint8Array {
-    const ret = new Uint8Array(from.length - (end - start));
-    ret.set(from.slice(0, start+1), 0);
-    ret.set(from.slice(end+1, from.length), start+1);
-    return ret;
+    this._sync(true);
   }
   
   processSgrCodes(token: Token) {
@@ -153,8 +131,8 @@ export class ComintBuffer implements vscode.FileStat {
   
   pushInput(cmd: string) {
     this.proc?.write(`${cmd}\n`);
-    this._insert(this.data!.length, `${cmd}\n`);
-    this._sync(this.data!, true);
+    this.write(Buffer.from(`${cmd}\n`), this.data.length);
+    this._sync(true);
     this._inputRing.push(cmd);
     this._inputRingIndex = this._inputRing.length;
   }
@@ -203,7 +181,7 @@ export class ComintBuffer implements vscode.FileStat {
   
   delete(startIndex: number, endIndex: number) {
     this._delete(startIndex, endIndex);
-    this._sync(this.data!, true);
+    this._sync(true);
   }
   
   // replaceRange(rangeToReplace: vscode.Range, replacement: string, document: vscode.TextDocument) {
@@ -225,8 +203,7 @@ export class ComintBuffer implements vscode.FileStat {
   //   this._sync(this.data!, false);
   // }
   
-  _sync(data: Uint8Array, revert: boolean = false) {
-    this.data = data;
+  _sync(revert: boolean = false) {
     if (revert) {
       // after writing to the underlying virtual file/buffer, immediately 
       // "revert" the textdocument, so it reflects the new data, and doesn't show as "unsaved"
@@ -238,24 +215,40 @@ export class ComintBuffer implements vscode.FileStat {
       }
     }
   }
-  
-  _insert(index: number, insertion: string) {
-    if (!this.data) { throw new Error("Tried to insert but there is no data."); }
-    if (index > this.data.length) { throw new Error(`Invalid index. index (${index}) is greater than the data length (${this.data.length}).`); }
-    
-    const insertionBuffer = Buffer.from(insertion);
-    const newlen = this.data.length + insertion.length;
-    const newdata = new Uint8Array(newlen);
-    newdata.set(this.data, 0);
-    newdata.set(insertionBuffer, this.data.length);
-    this.data = newdata;
+
+  write(value: Uint8Array, atIndex: number): number {
+    const headroom = this.data.length - atIndex;
+    if (headroom >= value.length) {
+      // there's enough room, just write it
+      this.data.set(value, atIndex);
+      return atIndex + value.length;
+    } else {
+      // there's not enough room, make a bigger array and then write it
+      const ret = new Uint8Array(this.data.length + (value.length - headroom));
+      ret.set(this.data, 0);
+      ret.set(value, atIndex);
+      this.data = ret;
+      return ret.length;
+    }
   }
+  
+  // _insert(index: number, insertion: string) {
+  //   if (!this.data) { throw new Error("Tried to insert but there is no data."); }
+  //   if (index > this.data.length) { throw new Error(`Invalid index. index (${index}) is greater than the data length (${this.data.length}).`); }
+    
+  //   const insertionBuffer = Buffer.from(insertion);
+  //   const newlen = this.data.length + insertion.length;
+  //   const newdata = new Uint8Array(newlen);
+  //   newdata.set(this.data, 0);
+  //   newdata.set(insertionBuffer, this.data.length);
+  //   this.data = newdata;
+  // }
   
   _delete(startIndex: number, endIndex: number) {
     if (!this.data) { throw new Error("Tried to delete but there is no data."); }
     if (endIndex < startIndex) { throw new Error(`Invalid indices. startIndex (${startIndex}) is greater than endIndex ${endIndex}.`); }
     
-    const sizeToDelete = endIndex - startIndex;
+    const sizeToDelete = (endIndex - startIndex) + 1;
     if (sizeToDelete > this.data.length) { throw new Error(`Cannot delete more data than is in the buffer! startIndex: ${startIndex}, endIndex: ${endIndex}, buffer size: ${this.data.length}`); }
     
     // console.log(`startIndex: ${startIndex}`);
@@ -270,13 +263,13 @@ export class ComintBuffer implements vscode.FileStat {
     // console.log(`firstSlice: ${Buffer.from(firstSlice).toString('utf-8')}`);
     // console.log(`firstSlice.length: ${firstSlice.length}`);
     newdata.set(firstSlice, 0);
-    const secondSlice = this.data.slice(endIndex, this.data.length);
+    const secondSlice = this.data.slice(endIndex+1, this.data.length);
     // console.log(`secondSlice: ${Buffer.from(secondSlice).toString('utf-8')}`);
     // console.log(`secondSlice.length: ${secondSlice.length}`);
     // console.log(`newTotalLength: ${firstSlice.length + secondSlice.length}`);
     newdata.set(secondSlice, startIndex);
     
-    console.log(`newdata: ${newdata}`);
+    //console.log(`newdata: ${newdata}`);
     this.data = newdata;
   }
   
