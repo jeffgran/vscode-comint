@@ -6,13 +6,74 @@ const promptDecoration = vscode.window.createTextEditorDecorationType({
   textDecoration: 'underline'
 });
 
+const ansiBlackDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiBlack'),
+});
 const ansiRedDecoration = vscode.window.createTextEditorDecorationType({
   color: new vscode.ThemeColor('terminal.ansiRed'),
 });
-
 const ansiGreenDecoration = vscode.window.createTextEditorDecorationType({
   color: new vscode.ThemeColor('terminal.ansiGreen'),
 });
+const ansiYellowDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiYellow'),
+});
+const ansiBlueDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiBlue'),
+});
+const ansiMagentaDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiMagenta'),
+});
+const ansiCyanDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiCyan'),
+});
+const ansiWhiteDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiWhite'),
+});
+const ansiBrightBlackDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiBrightBlack'),
+});
+const ansiBrightRedDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiBrightRed'),
+});
+const ansiBrightGreenDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiBrightGreen'),
+});
+const ansiBrightYellowDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiBrightYellow'),
+});
+const ansiBrightBlueDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiBrightBlue'),
+});
+const ansiBrightMagentaDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiBrightMagenta'),
+});
+const ansiBrightCyanDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiBrightCyan'),
+});
+const ansiBrightWhiteDecoration = vscode.window.createTextEditorDecorationType({
+  color: new vscode.ThemeColor('terminal.ansiBrightWhite'),
+});
+
+const sgrCodeMap = new Map([
+  [30, ansiBlackDecoration],
+  [31, ansiRedDecoration],
+  [32, ansiGreenDecoration],
+  [33, ansiYellowDecoration],
+  [34, ansiBlueDecoration],
+  [35, ansiMagentaDecoration],
+  [36, ansiCyanDecoration],
+  [37, ansiWhiteDecoration],
+  
+  [90, ansiBrightBlackDecoration],
+  [91, ansiBrightRedDecoration],
+  [92, ansiBrightGreenDecoration],
+  [93, ansiBrightYellowDecoration],
+  [94, ansiBrightBlueDecoration],
+  [95, ansiBrightMagentaDecoration],
+  [96, ansiBrightCyanDecoration],
+  [97, ansiBrightWhiteDecoration],
+]);
 
 type TextObject = {
   text: string
@@ -72,7 +133,7 @@ export class Comint {
   };
   
   sendCtrlC = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
-    console.log('comint.setDecorations');
+    console.log('comint.sendCtrlC');
     if (editor.document.uri.scheme !== "comint") { return; }
     
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
@@ -93,10 +154,20 @@ export class Comint {
     editor.setDecorations(promptDecoration, ranges);
     
     const sgrSegments = comintBuffer.sgrSegments;
-    const sgrRanges = sgrSegments.map(s => {
-      return new vscode.Range(editor.document.positionAt(s.startIndex), editor.document.positionAt(s.endIndex));
+    const sgrRanges = sgrSegments.reduce<Map<number, vscode.Range[]>>((acc, segment) => {
+      const range = new vscode.Range(editor.document.positionAt(segment.startIndex), editor.document.positionAt(segment.endIndex + 1));
+      if (acc.get(segment.code) === undefined) {
+        acc.set(segment.code, []);
+      }
+      acc.get(segment.code)!.push(range);
+      return acc;
+    }, new Map());
+    sgrRanges.forEach((ranges, code) => {
+      const decoration = sgrCodeMap.get(code);
+      if (decoration !== undefined) {
+        editor.setDecorations(decoration, ranges);
+      }
     });
-    editor.setDecorations(ansiGreenDecoration, sgrRanges);
   };
   
   stickyBottom = (editor: vscode.TextEditor, _edit: vscode.TextEditorEdit, uri: vscode.Uri) => {

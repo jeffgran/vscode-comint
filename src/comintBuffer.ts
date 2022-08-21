@@ -60,53 +60,87 @@ export class ComintBuffer implements vscode.FileStat {
   }
   
   applyChunk(chunkString: string) {
-    // console.log('[proc.onData] new data:', chunkString.replace(/\r/g, "/r").replace(/\n/g, "/n\n"));
-    // console.log('[proc.onData] new data raw:', Buffer.from(chunkString));
-    
+    //console.log('[proc.onData] new data:', chunkString.replace(/\r/g, "/r").replace(/\n/g, "/n\n").replace(/\x1b/g, '/x1b'));
+    console.log('[proc.onData] new data raw:', Buffer.from(chunkString));
     let match: RegExpExecArray | null;
     
+    let lastTokenEndIndex = -1;
     while((match = tokenRe.exec(chunkString)) !== null) {
-      const token = new Token(match);
-      //console.log(`token: ${token[0]}`, Buffer.from(token[0]));
-      if (token.isCrlfSequence()) {
-        this.inCR = false;
-        this.writeIndex = this.write(token.outputCharCodes(), this.writeIndex);
-      } else if (token.isCrSequence()) {
-        if (token.endIndex === chunkString.length - 1) {
-          this.inCR = true;
-        } else {
-          this.writeIndex = this.data!.lastIndexOf(10) + 1;
-        }
-      } else if (token.isKillLine()) {
-        if (this.writeIndex !== this.data.length) {
-          this.delete(this.writeIndex, this.data.length - 1);
-        }
-      } else if (token.isSgrCode()) {
-        this.processSgrCodes(token);
-        this.inCR = false;
-      } else if (token.isAnsiCode()) {
-        // other ANSI codes, ignore for now
-      } else { // any other character
-        if (this.inCR) {
-          this.writeIndex = this.data!.lastIndexOf(10) + 1;
-        }
-        this.writeIndex = this.write(token.outputCharCodes(), this.writeIndex);
-        this.inCR = false;
+      const thisToken = new Token(match);
+      const tokens: Token[] = [];
+      if (thisToken.startIndex > lastTokenEndIndex + 1) {
+        tokens.push(new Token(chunkString.slice(lastTokenEndIndex + 1, thisToken.startIndex), lastTokenEndIndex + 1, thisToken.startIndex - 1));
       }
+      tokens.push(thisToken);
+      tokens.forEach(token => {
+        const nextSgrSegments = this.handleToken(token, chunkString);
+        this.sgrSegments.push(...nextSgrSegments);
+      });
+      lastTokenEndIndex = thisToken.endIndex;
+    }
+    if (lastTokenEndIndex < chunkString.length - 1) {
+      const nextSgrSegments = this.handleToken(new Token(chunkString.slice(lastTokenEndIndex + 1, chunkString.length), lastTokenEndIndex + 1, chunkString.length - 1), chunkString);
+      this.sgrSegments.push(...nextSgrSegments);
     }
     
     this._sync(true);
   }
   
-  processSgrCodes(token: Token) {
+  handleToken(token: Token, chunkString: string): SgrSegment[] {
+    const nextSgrSegments: SgrSegment[] = [];
+    
+    console.log(`token: ${token.str}, ${new Uint8Array(Buffer.from(token.str))} - startIndex:${token.startIndex}, endIndex: ${token.endIndex}`);
+    if (token.isCrlfSequence()) {
+      this.inCR = false;
+      this.writeIndex = this.write(token.outputCharCodes(), this.writeIndex);
+    } else if (token.isCrSequence()) {
+      if (token.endIndex === chunkString.length - 1) {
+        this.inCR = true;
+      } else {
+        this.writeIndex = this.data!.lastIndexOf(10) + 1;
+      }
+    } else if (token.isKillLine()) {
+      if (this.writeIndex !== this.data.length) {
+        this.delete(this.writeIndex, this.data.length - 1);
+      }
+    } else if (token.isSgrCode()) {
+      nextSgrSegments.push(...this.processSgrCodes(token));
+      this.inCR = false;
+    } else if (token.isAnsiCode()) {
+      // other ANSI codes, ignore for now
+      console.log(`ignoring ansi code: ${new Uint8Array(Buffer.from(token.str))}`);
+    } else { // any other character/sequence
+      if (this.inCR) {
+        this.writeIndex = this.data.lastIndexOf(10) + 1;
+      }
+      this.writeIndex = this.write(token.outputCharCodes(), this.writeIndex);
+      this.inCR = false;
+    }
+    return nextSgrSegments;
+  }
+  
+  processSgrCodes(token: Token): SgrSegment[] {
     const sgrcodes = token.sgrCodes();
+    const ret: SgrSegment[] = [];
     sgrcodes?.forEach(sgrcode => {
       if (sgrcode === 0) {
         this.openSgrSegments.forEach(s => {
-          s.endIndex = this.writeIndex;
-          this.sgrSegments.push(s);
+          s.endIndex = this.writeIndex - 1;
+          ret.push(s);
         });
         this.openSgrSegments = [];
+      } else if (sgrcode === 39) { // "default foreground"
+        this.openSgrSegments.filter((s, i)=> {
+          const ret = s.code >= 30 && s.code <= 38;
+          if (ret) {
+            this.openSgrSegments.splice(i, 1);
+          }
+          return ret;
+        }).forEach(s => {
+          s.endIndex = this.writeIndex - 1;
+          ret.push(s);
+        });
+        
       } else {
         this.openSgrSegments.push({
           code: sgrcode,
@@ -115,6 +149,7 @@ export class ComintBuffer implements vscode.FileStat {
         });
       }
     });
+    return ret;
   }
   
   addPromptRange(range: vscode.Range) {
@@ -131,7 +166,9 @@ export class ComintBuffer implements vscode.FileStat {
   
   pushInput(cmd: string) {
     this.proc?.write(`${cmd}\n`);
-    this.write(Buffer.from(`${cmd}\n`), this.data.length);
+    const buf = Buffer.from(`${cmd}\n`);
+    this.write(buf, this.data.length);
+    this.writeIndex += buf.length;
     this._sync(true);
     this._inputRing.push(cmd);
     this._inputRingIndex = this._inputRing.length;
@@ -181,6 +218,37 @@ export class ComintBuffer implements vscode.FileStat {
   
   delete(startIndex: number, endIndex: number) {
     this._delete(startIndex, endIndex);
+    
+    const deleteIndexes: number[] = [];
+    const shift = (endIndex - startIndex) + 1;
+    this.sgrSegments.forEach((segment, i) => {
+      if (segment.startIndex >= startIndex && segment.endIndex <= endIndex) {
+        // wholly contained in the deleted section
+        deleteIndexes.push(i);
+      } else if (segment.endIndex > startIndex) {
+        // end of segment overlaps deleted section
+        segment.endIndex = startIndex - 1;
+      } else if (segment.startIndex < endIndex && segment.endIndex > startIndex) {
+        // beginning of segment overlaps deleted section
+        segment.startIndex = endIndex + 1;
+        segment.startIndex -= shift;
+        segment.endIndex -= shift;
+      } else if (segment.startIndex >= endIndex) {
+        // wholly after the deleted section
+        segment.startIndex -= shift;
+        segment.endIndex -= shift;
+      }
+    });
+    
+    deleteIndexes.sort((a,b) => b - a).forEach(i => this.sgrSegments.splice(i, 1));
+    
+    if (this.writeIndex > startIndex) {
+      this.writeIndex -= shift;
+    }
+    // if (this.writeIndex < 0) { 
+    //   this.writeIndex = 0;
+    // }
+    
     this._sync(true);
   }
   
@@ -215,18 +283,53 @@ export class ComintBuffer implements vscode.FileStat {
       }
     }
   }
-
+  
   write(value: Uint8Array, atIndex: number): number {
+    const endIndex = (atIndex + value.length) - 1;
+    
+    this.sgrSegments.forEach((segment, i) => {
+      if (segment.startIndex >= atIndex && segment.endIndex <= endIndex) {
+        // wholly contained in the deleted section
+        //deleteIndexes.push(i);
+      } else if (segment.endIndex > atIndex) {
+        // end of segment overlaps deleted section
+        segment.endIndex = atIndex - 1;
+      } else if (segment.startIndex < endIndex && segment.endIndex > atIndex) {
+        // beginning of segment overlaps deleted section
+        segment.startIndex = endIndex + 1;
+        // segment.startIndex -= shift;
+        // segment.endIndex -= shift;
+      } else if (segment.startIndex >= endIndex) {
+        // wholly after the deleted section
+        // segment.startIndex -= shift;
+        // segment.endIndex -= shift;
+      }
+    });
+    
+    const deleteIndexes: number[] = [];
+    this.sgrSegments.forEach((segment, i) => {
+      if (segment.endIndex <= segment.startIndex) {
+        deleteIndexes.push(i);
+      }
+    });
+    
+    deleteIndexes.sort((a,b) => b - a).forEach(i => this.sgrSegments.splice(i, 1));
+    
     const headroom = this.data.length - atIndex;
     if (headroom >= value.length) {
       // there's enough room, just write it
-      this.data.set(value, atIndex);
+      try {
+        this.data.set(value, atIndex);
+      } catch(e) {
+        console.log('here');
+      }
       return atIndex + value.length;
     } else {
       // there's not enough room, make a bigger array and then write it
       const ret = new Uint8Array(this.data.length + (value.length - headroom));
       ret.set(this.data, 0);
       ret.set(value, atIndex);
+      
       this.data = ret;
       return ret.length;
     }
@@ -235,7 +338,7 @@ export class ComintBuffer implements vscode.FileStat {
   // _insert(index: number, insertion: string) {
   //   if (!this.data) { throw new Error("Tried to insert but there is no data."); }
   //   if (index > this.data.length) { throw new Error(`Invalid index. index (${index}) is greater than the data length (${this.data.length}).`); }
-    
+  
   //   const insertionBuffer = Buffer.from(insertion);
   //   const newlen = this.data.length + insertion.length;
   //   const newdata = new Uint8Array(newlen);
@@ -269,7 +372,7 @@ export class ComintBuffer implements vscode.FileStat {
     // console.log(`newTotalLength: ${firstSlice.length + secondSlice.length}`);
     newdata.set(secondSlice, startIndex);
     
-    //console.log(`newdata: ${newdata}`);
+    // console.log(`newdata: ${newdata}`);
     this.data = newdata;
   }
   

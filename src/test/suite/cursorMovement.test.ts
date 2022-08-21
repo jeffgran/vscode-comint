@@ -3,8 +3,7 @@ import * as assert from 'assert';
 // You can import and use all API from the 'vscode' module
 // as well as import your extension to test it
 import * as vscode from 'vscode';
-import { ComintBuffer } from '../../comintBuffer';
-import { MemFS } from '../../fileSystemProvider';
+import { ComintBuffer, SgrSegment } from '../../comintBuffer';
 
 suite('ComintBuffer #applyChunk', () => {
 	test('pv', () => {
@@ -58,19 +57,67 @@ suite('ComintBuffer #applyChunk', () => {
 	test ('/r and ESC[K to kill line (npm)', () => {
 		const cm = new ComintBuffer('name', vscode.Uri.parse('comint:/'));
 		const input1 = '[\x1b[100;90m..................\x1b[0m] \ reify: \x1b[43;40mtiming\x1b[0m \x1b[35marborist:longer-name\x1b[0m Completed in 0ms\x1b[0m\x1b[K\r';
-		const output1 = cm.applyChunk(input1);
+		cm.applyChunk(input1);
 		assert.deepEqual(Buffer.from(cm.data).toString(), '[..................] \ reify: timing arborist:longer-name Completed in 0ms');
 		
+		assert.deepEqual(cm.sgrSegments, [
+			{ code: 100, startIndex: 1, endIndex: 18 },
+			{ code: 90, startIndex: 1, endIndex: 18 },
+			{ code: 43, startIndex: 29, endIndex: 34 },
+			{ code: 40, startIndex: 29, endIndex: 34 },
+			{ code: 35, startIndex: 36, endIndex: 55 },
+		]);
+		
 		const input2 = '[\x1b[107;97m#########\x1b[0m\x1b[100;90m.........\x1b[0m] \ idealTree: \x1b[43;40mtiming\x1b[0m \x1b[35midealTree\x1b[0m Completed in 80ms\x1b[0m\x1b[K\r';
-		const output2 = cm.applyChunk(input2);
+		cm.applyChunk(input2);
 		assert.deepEqual(Buffer.from(cm.data).toString(), '[#########.........] \ idealTree: timing idealTree Completed in 80ms');
-
+		
+		console.log(cm.sgrSegments);
+		
+		assert.deepEqual(cm.sgrSegments, [
+			{ code: 107, startIndex: 1, endIndex: 9 },
+			{ code: 97, startIndex: 1, endIndex: 9 },
+			{ code: 100, startIndex: 10, endIndex: 18 },
+			{ code: 90, startIndex: 10, endIndex: 18 },
+			{ code: 43, startIndex: 33, endIndex: 38 },
+			{ code: 40, startIndex: 33, endIndex: 38 },
+			{ code: 35, startIndex: 40, endIndex: 48 },
+		]);
+		
 		const input3 = '\r\x1b[K\x1b[?25h';
-		const output3 = cm.applyChunk(input3);
+		cm.applyChunk(input3);
 		assert.deepEqual(Buffer.from(cm.data).toString(), '');
+		assert.strictEqual(cm.writeIndex, 0);
 		
 		const input4 = '\r\nup to date.';
-		const output4 = cm.applyChunk(input4);
+		cm.applyChunk(input4);
 		assert.deepEqual(Buffer.from(cm.data).toString(), '\nup to date.');
 	});
+	
+
+	// to fix: codes 2K, 1G, and unicode char size
+	test ('ESC[2K and ESC[1G and 3-byte utf8 chars (npm rebuild)', () => {
+		const cm = new ComintBuffer('name', vscode.Uri.parse('comint:/'));
+		const input1 = '\x1b[36m⠋\x1b[39m Searching dependency tree';
+		cm.applyChunk(input1);
+		assert.deepEqual(Buffer.from(cm.data).toString(), '⠋ Searching dependency tree');
+
+		assert.deepEqual(cm.sgrSegments, [
+			{ code: 36, startIndex: 0, endIndex: 0 }
+		]);
+	});
+	
+	// '\x1b[36m⠋\x1b[39m Searching dependency tree'
+	// '\x1b[2K'
+	// '\x1b[1G\x1b[36m⠙\x1b[39m Searching dependency tree'
+	// '\x1b[2K'
+	// '/x1b[1G/x1b[36m⠹/x1b[39m Building module: node-pty, Completed: 0'
+	// '\x1b[2K'
+	// '/x1b[1G/x1b[36m⠸/x1b[39m Building module: node-pty, Completed: 0'
+	// '\x1b[2K'
+	// '  CXX(target) Release/obj.target/pty/src/unix/pty.o/r/n'
+	// '/x1b[2K/x1b[1G/x1b[36m⠧/x1b[39m Building module: node-pty, Completed: 0'
+	// '\x1b[2K'
+	// '/x1b[2K/x1b[1G'
+	// '/x1b[?25h/x1b[32m✔/x1b[39m Rebuild Complete/r/n/x1b[?25h'
 });

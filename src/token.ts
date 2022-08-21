@@ -1,14 +1,24 @@
-export const tokenRe = /(\x1b\[[0-9]*[ABCDEFGJKST]|\x1b\[\?25[hl]|\x1b\[(?<code>[0-9]*;?)+m|\r+\n?|.)/g;
+//export const tokenRe = /(\x1b\[[0-9]*[ABCDEFGJKST]|\x1b\[\?25[hl]|\x1b\[([0-9]+;?)+m|\x1b\[[0-9]*m|\r+\n?|[^\x1b\r\n]+)/g;
+export const tokenRe = /(\x1b\[[0-9]*[ABCDEFGJKST]|\x1b\[\?25[hl]|\x1b\[([0-9]+;?)+m|\x1b\[[0-9]*m|\r+\n?)/g;
 
 export class Token {
   str: string;
   startIndex: number;
   endIndex: number;
 
-  constructor(match: RegExpExecArray) {
-    this.str = match[0];
-    this.startIndex = match.index;
-    this.endIndex = match.index + match[0].length - 1;
+  constructor(one: RegExpExecArray);
+  constructor(one: string, startIndex: number, endIndex: number);
+  
+  constructor(one: RegExpExecArray | string, startIndex?: number, endIndex?: number) {
+    if (typeof one === 'string') {
+      this.str = one;
+      this.startIndex = startIndex!;
+      this.endIndex = endIndex!;
+    } else {
+      this.str = one[0];
+      this.startIndex = one.index;
+      this.endIndex = one.index + one[0].length - 1;
+    }
   }
   
   isCrlfSequence(): boolean {
@@ -20,7 +30,15 @@ export class Token {
   }
   
   isKillLine(): boolean {
-    return this.str === '\x1b\[K';
+    return this.str === '\x1b\[K' || this.str === '\x1b\[0K';
+  }
+  
+  isKillLineBackward(): boolean {
+    return this.str === '\x1b\[1K';
+  }
+  
+  isKillWholeLine(): boolean {
+    return this.str === '\x1b\[2K';
   }
   
   isAnsiCode(): boolean {
