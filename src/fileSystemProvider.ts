@@ -58,7 +58,7 @@ export class MemFS implements vscode.FileSystemProvider {
         throw vscode.FileSystemError.FileNotFound();
     }
     
-    writeFile(uri: vscode.Uri, content: Uint8Array, options: { create: boolean, overwrite: boolean }): void {
+    writeFile(uri: vscode.Uri, data: Uint8Array, options: { create: boolean, overwrite: boolean }): void {
         const basename = path.posix.basename(uri.path);
         const parent = this._lookupParentDirectory(uri);
         let entry = parent.entries.get(basename);
@@ -78,8 +78,8 @@ export class MemFS implements vscode.FileSystemProvider {
             this._fireSoon({ type: vscode.FileChangeType.Created, uri });
         }
         entry.mtime = Date.now();
-        entry.size = content.byteLength;
-        entry.data = content;
+        entry.size = data.byteLength;
+        entry.content = data.toString();
         this._fireSoon({ type: vscode.FileChangeType.Changed, uri });
     }
     

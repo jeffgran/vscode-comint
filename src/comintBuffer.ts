@@ -17,7 +17,7 @@ export class ComintBuffer implements vscode.FileStat {
   editor?: vscode.TextEditor;
   
   name: string;
-  data: Uint8Array = Buffer.from('');
+  content: string = '';
   proc?: IPty;
   promptRanges: vscode.Range[];
   
@@ -39,6 +39,10 @@ export class ComintBuffer implements vscode.FileStat {
     this.promptRanges = [];
     this._inputRing = [];
     this.uri = uri;
+  }
+
+  get data(): Uint8Array {
+    return Buffer.from(this.content);
   }
   
   startComint(uri: vscode.Uri, editor: vscode.TextEditor) {
@@ -77,7 +81,7 @@ export class ComintBuffer implements vscode.FileStat {
     if (lastTokenEndIndex < chunkString.length - 1) {
       tokens.push(new Token(chunkString.slice(lastTokenEndIndex + 1, chunkString.length), lastTokenEndIndex + 1, chunkString.length - 1));
     }
-
+    
     tokens.forEach(token => {
       this.sgrSegments.push(...this.handleToken(token, chunkString));
     });
@@ -91,16 +95,16 @@ export class ComintBuffer implements vscode.FileStat {
     console.log(`token: ${token.str}, ${new Uint8Array(Buffer.from(token.str))} - startIndex:${token.startIndex}, endIndex: ${token.endIndex}`);
     if (token.isCrlfSequence()) {
       this.inCR = false;
-      this.writeIndex = this.write(token.outputCharCodes(), this.writeIndex);
+      this.writeIndex = this.write(token.outputString(), this.writeIndex);
     } else if (token.isCrSequence()) {
       if (token.endIndex === chunkString.length - 1) {
         this.inCR = true;
       } else {
-        this.writeIndex = this.data!.lastIndexOf(10) + 1;
+        this.writeIndex = this.content!.lastIndexOf('\n') + 1;
       }
     } else if (token.isKillLine()) {
-      if (this.writeIndex !== this.data.length) {
-        this.delete(this.writeIndex, this.data.length - 1);
+      if (this.writeIndex !== this.content.length) {
+        this.delete(this.writeIndex, this.content.length - 1);
       }
     } else if (token.isSgrCode()) {
       nextSgrSegments.push(...this.processSgrCodes(token));
@@ -110,9 +114,9 @@ export class ComintBuffer implements vscode.FileStat {
       console.log(`ignoring ansi code: ${new Uint8Array(Buffer.from(token.str))}`);
     } else { // any other character/sequence
       if (this.inCR) {
-        this.writeIndex = this.data.lastIndexOf(10) + 1;
+        this.writeIndex = this.content.lastIndexOf('\n') + 1;
       }
-      this.writeIndex = this.write(token.outputCharCodes(), this.writeIndex);
+      this.writeIndex = this.write(token.outputString(), this.writeIndex);
       this.inCR = false;
     }
     return nextSgrSegments;
@@ -165,9 +169,8 @@ export class ComintBuffer implements vscode.FileStat {
   
   pushInput(cmd: string) {
     this.proc?.write(`${cmd}\n`);
-    const buf = Buffer.from(`${cmd}\n`);
-    this.write(buf, this.data.length);
-    this.writeIndex += buf.length;
+    const str = `${cmd}\n`;
+    this.writeIndex = this.write(str, this.content.length);
     this._sync(true);
     this._inputRing.push(cmd);
     this._inputRingIndex = this._inputRing.length;
@@ -224,15 +227,15 @@ export class ComintBuffer implements vscode.FileStat {
       if (segment.startIndex >= startIndex && segment.endIndex <= endIndex) {
         // wholly contained in the deleted section
         deleteIndexes.push(i);
-      } else if (segment.endIndex > startIndex) {
+      } else if (segment.endIndex >= startIndex && segment.startIndex < startIndex) {
         // end of segment overlaps deleted section
         segment.endIndex = startIndex - 1;
-      } else if (segment.startIndex < endIndex && segment.endIndex > startIndex) {
+      } else if (segment.startIndex <= endIndex && segment.endIndex > endIndex) {
         // beginning of segment overlaps deleted section
         segment.startIndex = endIndex + 1;
         segment.startIndex -= shift;
         segment.endIndex -= shift;
-      } else if (segment.startIndex >= endIndex) {
+      } else if (segment.startIndex > endIndex) {
         // wholly after the deleted section
         segment.startIndex -= shift;
         segment.endIndex -= shift;
@@ -261,60 +264,46 @@ export class ComintBuffer implements vscode.FileStat {
     }
   }
   
-  write(value: Uint8Array, atIndex: number): number {
+  write(value: string, atIndex: number): number {
     const endIndex = (atIndex + value.length) - 1;
     
+    const deleteIndexes: number[] = [];
+
     this.sgrSegments.forEach((segment, i) => {
-      if (segment.endIndex > atIndex && segment.startIndex < atIndex) {
+      if (segment.startIndex >= atIndex && segment.endIndex <= endIndex) {
+        // wholly contained in the deleted section
+        deleteIndexes.push(i);
+      } else if (segment.endIndex >= atIndex && segment.startIndex < atIndex) {
         // end of segment overlaps deleted section
         segment.endIndex = atIndex - 1;
-      } else if (segment.startIndex < endIndex && segment.endIndex > atIndex) {
+      } else if (segment.startIndex <= endIndex && segment.endIndex > endIndex) {
         // beginning of segment overlaps deleted section
         segment.startIndex = endIndex + 1;
       }
     });
     
-    const deleteIndexes: number[] = [];
-    this.sgrSegments.forEach((segment, i) => {
-      if (segment.endIndex <= segment.startIndex) {
-        deleteIndexes.push(i);
-      }
-    });
-    
     deleteIndexes.sort((a,b) => b - a).forEach(i => this.sgrSegments.splice(i, 1));
     
-    const headroom = this.data.length - atIndex;
+    const headroom = this.content.length - atIndex;
     if (headroom >= value.length) {
-      // there's enough room, just write it
-      try {
-        this.data.set(value, atIndex);
-      } catch(e) {
-        console.log('here');
-      }
+      // there's enough room
+      this.content = this.content.slice(0, atIndex) + value + this.content.slice(atIndex + value.length);
       return atIndex + value.length;
     } else {
-      // there's not enough room, make a bigger array and then write it
-      const ret = new Uint8Array(this.data.length + (value.length - headroom));
-      ret.set(this.data, 0);
-      ret.set(value, atIndex);
-      
-      this.data = ret;
-      return ret.length;
+      // there's not enough room
+      this.content = this.content.slice(0, atIndex) + value;
+      return this.content.length;
     }
   }
-    
+  
   _delete(startIndex: number, endIndex: number) {
-    if (!this.data) { throw new Error("Tried to delete but there is no data."); }
+    if (!this.content) { throw new Error("Tried to delete but there is no data."); }
     if (endIndex < startIndex) { throw new Error(`Invalid indices. startIndex (${startIndex}) is greater than endIndex ${endIndex}.`); }
     
     const sizeToDelete = (endIndex - startIndex) + 1;
-    if (sizeToDelete > this.data.length) { throw new Error(`Cannot delete more data than is in the buffer! startIndex: ${startIndex}, endIndex: ${endIndex}, buffer size: ${this.data.length}`); }
+    if (sizeToDelete > this.content.length) { throw new Error(`Cannot delete more data than is in the buffer! startIndex: ${startIndex}, endIndex: ${endIndex}, buffer size: ${this.content.length}`); }
     
-    const newdata = new Uint8Array(this.data.length - sizeToDelete);
-    newdata.set(this.data.slice(0, startIndex), 0);
-    newdata.set(this.data.slice(endIndex+1, this.data.length), startIndex);
-    
-    this.data = newdata;
+    this.content = this.content.slice(0, startIndex) + this.content.slice(endIndex+1, this.content.length);
   }
   
   _rootPath() {

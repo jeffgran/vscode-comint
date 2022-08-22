@@ -55,13 +55,13 @@ export class Token {
     return match![1].split(';').map(s => s === '' ? 0 : parseInt(s, 10));
   }
   
-  outputCharCodes(): Uint8Array {
+  outputString(): string {
     if (this.isCrlfSequence()) {
-      return Buffer.from('\n');
+      return '\n';
     } else if (!this.isAnsiCode()) {
-      return Buffer.from(this.str);
+      return this.str;
     } else {
-      return new Uint8Array(0);
+      return '';
     }
   }
 }

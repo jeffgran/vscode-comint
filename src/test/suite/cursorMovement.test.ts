@@ -16,27 +16,27 @@ suite('ComintBuffer #applyChunk', () => {
 		
 		cm.applyChunk(input1);
 		assert.equal(cm.inCR, true);
-		assert.deepEqual(Buffer.from(cm.data).toString(), '  720MiB 0:00:01 [ 720MiB/s] [=======>                          ] 25% ETA 0:00:02');
+		assert.deepEqual(Buffer.from(cm.content).toString(), '  720MiB 0:00:01 [ 720MiB/s] [=======>                          ] 25% ETA 0:00:02');
 		
 		cm.applyChunk(input2);
 		assert.equal(cm.inCR, true);
-		assert.deepEqual(Buffer.from(cm.data).toString(), ' 1.43GiB 0:00:02 [ 739MiB/s] [================>                 ] 51% ETA 0:00:01');
+		assert.deepEqual(Buffer.from(cm.content).toString(), ' 1.43GiB 0:00:02 [ 739MiB/s] [================>                 ] 51% ETA 0:00:01');
 		
 		cm.applyChunk(input3);
 		assert.equal(cm.inCR, true);
-		assert.deepEqual(Buffer.from(cm.data).toString(), ' 2.12GiB 0:00:03 [ 714MiB/s] [========================>         ] 75% ETA 0:00:00');
+		assert.deepEqual(Buffer.from(cm.content).toString(), ' 2.12GiB 0:00:03 [ 714MiB/s] [========================>         ] 75% ETA 0:00:00');
 		
 		cm.applyChunk(input4);
 		assert.equal(cm.inCR, true);
-		assert.deepEqual(Buffer.from(cm.data).toString(), ' 2.73GiB 0:00:04 [ 624MiB/s] [===============================>  ] 97% ETA 0:00:00');
+		assert.deepEqual(Buffer.from(cm.content).toString(), ' 2.73GiB 0:00:04 [ 624MiB/s] [===============================>  ] 97% ETA 0:00:00');
 		
 		cm.applyChunk(input5);
 		assert.equal(cm.inCR, false);
-		assert.deepEqual(Buffer.from(cm.data).toString(), ' 2.79GiB 0:00:04 [ 699MiB/s] [================================>] 100%            \n');
+		assert.deepEqual(Buffer.from(cm.content).toString(), ' 2.79GiB 0:00:04 [ 699MiB/s] [================================>] 100%            \n');
 		
 		cm.applyChunk('next prompt >');
 		assert.equal(cm.inCR, false);
-		assert.deepEqual(Buffer.from(cm.data).toString(), ' 2.79GiB 0:00:04 [ 699MiB/s] [================================>] 100%            \nnext prompt >');
+		assert.deepEqual(Buffer.from(cm.content).toString(), ' 2.79GiB 0:00:04 [ 699MiB/s] [================================>] 100%            \nnext prompt >');
 	});
 	
 	test('/r with partial line', () => {
@@ -47,18 +47,18 @@ suite('ComintBuffer #applyChunk', () => {
 		
 		cm.applyChunk(input1);
 		assert.equal(cm.inCR, false);
-		assert.deepEqual(Buffer.from(cm.data).toString(), 'safeword');
+		assert.deepEqual(Buffer.from(cm.content).toString(), 'safeword');
 		
 		const output2 = cm.applyChunk(input2);
 		assert.equal(cm.inCR, false);
-		assert.deepEqual(Buffer.from(cm.data).toString(), 'safety first!\n');	
+		assert.deepEqual(Buffer.from(cm.content).toString(), 'safety first!\n');	
 	});
 	
 	test ('/r and ESC[K to kill line (npm)', () => {
 		const cm = new ComintBuffer('name', vscode.Uri.parse('comint:/'));
 		const input1 = '[\x1b[100;90m..................\x1b[0m] \ reify: \x1b[43;40mtiming\x1b[0m \x1b[35marborist:longer-name\x1b[0m Completed in 0ms\x1b[0m\x1b[K\r';
 		cm.applyChunk(input1);
-		assert.deepEqual(Buffer.from(cm.data).toString(), '[..................] \ reify: timing arborist:longer-name Completed in 0ms');
+		assert.deepEqual(Buffer.from(cm.content).toString(), '[..................] \ reify: timing arborist:longer-name Completed in 0ms');
 		
 		assert.deepEqual(cm.sgrSegments, [
 			{ code: 100, startIndex: 1, endIndex: 18 },
@@ -70,7 +70,7 @@ suite('ComintBuffer #applyChunk', () => {
 		
 		const input2 = '[\x1b[107;97m#########\x1b[0m\x1b[100;90m.........\x1b[0m] \ idealTree: \x1b[43;40mtiming\x1b[0m \x1b[35midealTree\x1b[0m Completed in 80ms\x1b[0m\x1b[K\r';
 		cm.applyChunk(input2);
-		assert.deepEqual(Buffer.from(cm.data).toString(), '[#########.........] \ idealTree: timing idealTree Completed in 80ms');
+		assert.deepEqual(Buffer.from(cm.content).toString(), '[#########.........] \ idealTree: timing idealTree Completed in 80ms');
 		
 		console.log(cm.sgrSegments);
 		
@@ -86,12 +86,12 @@ suite('ComintBuffer #applyChunk', () => {
 		
 		const input3 = '\r\x1b[K\x1b[?25h';
 		cm.applyChunk(input3);
-		assert.deepEqual(Buffer.from(cm.data).toString(), '');
+		assert.deepEqual(Buffer.from(cm.content).toString(), '');
 		assert.strictEqual(cm.writeIndex, 0);
 		
 		const input4 = '\r\nup to date.';
 		cm.applyChunk(input4);
-		assert.deepEqual(Buffer.from(cm.data).toString(), '\nup to date.');
+		assert.deepEqual(Buffer.from(cm.content).toString(), '\nup to date.');
 	});
 	
 
@@ -100,7 +100,7 @@ suite('ComintBuffer #applyChunk', () => {
 		const cm = new ComintBuffer('name', vscode.Uri.parse('comint:/'));
 		const input1 = '\x1b[36m⠋\x1b[39m Searching dependency tree';
 		cm.applyChunk(input1);
-		assert.deepEqual(Buffer.from(cm.data).toString(), '⠋ Searching dependency tree');
+		assert.deepEqual(Buffer.from(cm.content).toString(), '⠋ Searching dependency tree');
 
 		assert.deepEqual(cm.sgrSegments, [
 			{ code: 36, startIndex: 0, endIndex: 0 }
