@@ -61,27 +61,26 @@ export class ComintBuffer implements vscode.FileStat {
   
   applyChunk(chunkString: string) {
     //console.log('[proc.onData] new data:', chunkString.replace(/\r/g, "/r").replace(/\n/g, "/n\n").replace(/\x1b/g, '/x1b'));
-    console.log('[proc.onData] new data raw:', Buffer.from(chunkString));
+    //console.log('[proc.onData] new data raw:', Buffer.from(chunkString));
     let match: RegExpExecArray | null;
     
     let lastTokenEndIndex = -1;
+    const tokens: Token[] = [];
     while((match = tokenRe.exec(chunkString)) !== null) {
       const thisToken = new Token(match);
-      const tokens: Token[] = [];
       if (thisToken.startIndex > lastTokenEndIndex + 1) {
         tokens.push(new Token(chunkString.slice(lastTokenEndIndex + 1, thisToken.startIndex), lastTokenEndIndex + 1, thisToken.startIndex - 1));
       }
       tokens.push(thisToken);
-      tokens.forEach(token => {
-        const nextSgrSegments = this.handleToken(token, chunkString);
-        this.sgrSegments.push(...nextSgrSegments);
-      });
       lastTokenEndIndex = thisToken.endIndex;
     }
     if (lastTokenEndIndex < chunkString.length - 1) {
-      const nextSgrSegments = this.handleToken(new Token(chunkString.slice(lastTokenEndIndex + 1, chunkString.length), lastTokenEndIndex + 1, chunkString.length - 1), chunkString);
-      this.sgrSegments.push(...nextSgrSegments);
+      tokens.push(new Token(chunkString.slice(lastTokenEndIndex + 1, chunkString.length), lastTokenEndIndex + 1, chunkString.length - 1));
     }
+
+    tokens.forEach(token => {
+      this.sgrSegments.push(...this.handleToken(token, chunkString));
+    });
     
     this._sync(true);
   }
@@ -245,31 +244,9 @@ export class ComintBuffer implements vscode.FileStat {
     if (this.writeIndex > startIndex) {
       this.writeIndex -= shift;
     }
-    // if (this.writeIndex < 0) { 
-    //   this.writeIndex = 0;
-    // }
     
     this._sync(true);
   }
-  
-  // replaceRange(rangeToReplace: vscode.Range, replacement: string, document: vscode.TextDocument) {
-  //   const startIndex = Buffer.byteLength(document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.start)));
-  //   const endIndex = Buffer.byteLength(document.getText(new vscode.Range(new vscode.Position(0, 0), rangeToReplace.end)));
-  //   this.replace(startIndex, endIndex, replacement);
-  // }
-  
-  // replace(startIndex: number, endIndex: number, replacement: string) {
-  //   console.log('comintBuffer.replace');
-  //   // console.log(`startIndex: ${startIndex}`);
-  //   // console.log(`endIndex: ${endIndex}`);
-  //   // console.log(`replacement: ${replacement}`);
-  //   if (endIndex > startIndex) {
-  //     this._delete(startIndex, endIndex);
-  //   }
-  //   this._insert(startIndex, replacement);
-  //   //this._memFs.writeFile(this.uri, this.data!, {create: false, overwrite: true});
-  //   this._sync(this.data!, false);
-  // }
   
   _sync(revert: boolean = false) {
     if (revert) {
@@ -288,21 +265,12 @@ export class ComintBuffer implements vscode.FileStat {
     const endIndex = (atIndex + value.length) - 1;
     
     this.sgrSegments.forEach((segment, i) => {
-      if (segment.startIndex >= atIndex && segment.endIndex <= endIndex) {
-        // wholly contained in the deleted section
-        //deleteIndexes.push(i);
-      } else if (segment.endIndex > atIndex) {
+      if (segment.endIndex > atIndex && segment.startIndex < atIndex) {
         // end of segment overlaps deleted section
         segment.endIndex = atIndex - 1;
       } else if (segment.startIndex < endIndex && segment.endIndex > atIndex) {
         // beginning of segment overlaps deleted section
         segment.startIndex = endIndex + 1;
-        // segment.startIndex -= shift;
-        // segment.endIndex -= shift;
-      } else if (segment.startIndex >= endIndex) {
-        // wholly after the deleted section
-        // segment.startIndex -= shift;
-        // segment.endIndex -= shift;
       }
     });
     
@@ -334,19 +302,7 @@ export class ComintBuffer implements vscode.FileStat {
       return ret.length;
     }
   }
-  
-  // _insert(index: number, insertion: string) {
-  //   if (!this.data) { throw new Error("Tried to insert but there is no data."); }
-  //   if (index > this.data.length) { throw new Error(`Invalid index. index (${index}) is greater than the data length (${this.data.length}).`); }
-  
-  //   const insertionBuffer = Buffer.from(insertion);
-  //   const newlen = this.data.length + insertion.length;
-  //   const newdata = new Uint8Array(newlen);
-  //   newdata.set(this.data, 0);
-  //   newdata.set(insertionBuffer, this.data.length);
-  //   this.data = newdata;
-  // }
-  
+    
   _delete(startIndex: number, endIndex: number) {
     if (!this.data) { throw new Error("Tried to delete but there is no data."); }
     if (endIndex < startIndex) { throw new Error(`Invalid indices. startIndex (${startIndex}) is greater than endIndex ${endIndex}.`); }
@@ -354,25 +310,10 @@ export class ComintBuffer implements vscode.FileStat {
     const sizeToDelete = (endIndex - startIndex) + 1;
     if (sizeToDelete > this.data.length) { throw new Error(`Cannot delete more data than is in the buffer! startIndex: ${startIndex}, endIndex: ${endIndex}, buffer size: ${this.data.length}`); }
     
-    // console.log(`startIndex: ${startIndex}`);
-    // console.log(`endIndex: ${endIndex}`);
-    // console.log(`sizeToDelete: ${sizeToDelete}`);
-    const newlen = this.data.length - (sizeToDelete);
-    // console.log(`origLen: ${this.data.length}`);
-    // console.log(`newlen: ${newlen}`);
-    const newdata = new Uint8Array(newlen);
+    const newdata = new Uint8Array(this.data.length - sizeToDelete);
+    newdata.set(this.data.slice(0, startIndex), 0);
+    newdata.set(this.data.slice(endIndex+1, this.data.length), startIndex);
     
-    const firstSlice = this.data.slice(0, startIndex);
-    // console.log(`firstSlice: ${Buffer.from(firstSlice).toString('utf-8')}`);
-    // console.log(`firstSlice.length: ${firstSlice.length}`);
-    newdata.set(firstSlice, 0);
-    const secondSlice = this.data.slice(endIndex+1, this.data.length);
-    // console.log(`secondSlice: ${Buffer.from(secondSlice).toString('utf-8')}`);
-    // console.log(`secondSlice.length: ${secondSlice.length}`);
-    // console.log(`newTotalLength: ${firstSlice.length + secondSlice.length}`);
-    newdata.set(secondSlice, startIndex);
-    
-    // console.log(`newdata: ${newdata}`);
     this.data = newdata;
   }
   
