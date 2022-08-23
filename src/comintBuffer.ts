@@ -85,6 +85,9 @@ export class ComintBuffer implements vscode.FileStat {
     tokens.forEach(token => {
       this.sgrSegments.push(...this.handleToken(token, chunkString));
     });
+
+    // console.log('this.sgrSegments', JSON.stringify(this.sgrSegments));
+    // console.log('this.openSgrSegments', JSON.stringify(this.openSgrSegments));
     
     this._sync(true);
   }
@@ -100,12 +103,14 @@ export class ComintBuffer implements vscode.FileStat {
       if (token.endIndex === chunkString.length - 1) {
         this.inCR = true;
       } else {
-        this.writeIndex = this.content!.lastIndexOf('\n') + 1;
+        this.writeIndex = this.content.lastIndexOf('\n') + 1;
       }
     } else if (token.isKillLine()) {
       if (this.writeIndex !== this.content.length) {
         this.delete(this.writeIndex, this.content.length - 1);
       }
+    } else if (token.isKillWholeLine()) {
+      this.delete(this.content.lastIndexOf('\n') + 1, this.content.length - 1);
     } else if (token.isSgrCode()) {
       nextSgrSegments.push(...this.processSgrCodes(token));
       this.inCR = false;
@@ -124,6 +129,7 @@ export class ComintBuffer implements vscode.FileStat {
   
   processSgrCodes(token: Token): SgrSegment[] {
     const sgrcodes = token.sgrCodes();
+    console.log('sgrCodes:', sgrcodes);
     const ret: SgrSegment[] = [];
     sgrcodes?.forEach(sgrcode => {
       if (sgrcode === 0) {

@@ -153,15 +153,17 @@ export class Comint {
     const ranges = comintBuffer.getPromptRanges();
     editor.setDecorations(promptDecoration, ranges);
     
+    const allCodes = new Map<number, vscode.Range[]>();
+    sgrCodeMap.forEach((decorationType, code) => {
+      allCodes.set(code, []);
+    });
+    
     const sgrSegments = comintBuffer.sgrSegments;
     const sgrRanges = sgrSegments.reduce<Map<number, vscode.Range[]>>((acc, segment) => {
       const range = new vscode.Range(editor.document.positionAt(segment.startIndex), editor.document.positionAt(segment.endIndex + 1));
-      if (acc.get(segment.code) === undefined) {
-        acc.set(segment.code, []);
-      }
-      acc.get(segment.code)!.push(range);
+      acc.get(segment.code)?.push(range);
       return acc;
-    }, new Map());
+    }, allCodes);
     sgrRanges.forEach((ranges, code) => {
       const decoration = sgrCodeMap.get(code);
       if (decoration !== undefined) {

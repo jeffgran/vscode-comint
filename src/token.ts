@@ -1,5 +1,5 @@
 //export const tokenRe = /(\x1b\[[0-9]*[ABCDEFGJKST]|\x1b\[\?25[hl]|\x1b\[([0-9]+;?)+m|\x1b\[[0-9]*m|\r+\n?|[^\x1b\r\n]+)/g;
-export const tokenRe = /(\x1b\[[0-9]*[ABCDEFGJKST]|\x1b\[\?25[hl]|\x1b\[([0-9]+;?)+m|\x1b\[[0-9]*m|\r+\n?)/g;
+export const tokenRe = /(\x1bc|\x1b\[[0-9]*[ABCDEFGJKST]|\x1b\[\?25[hl]|\x1b\[([0-9]+;?)+m|\x1b\[[0-9]*m|\r+\n?)/g;
 
 export class Token {
   str: string;
@@ -42,15 +42,20 @@ export class Token {
   }
   
   isAnsiCode(): boolean {
-    return this.str.startsWith('\x1b[');
+    return this.str.startsWith('\x1b');
   }
   
   isSgrCode(): boolean {
-    return this.str.match(/^\x1b\[([0-9];?)*m/) !== null;
+    return this.str.match(/^\x1b\[([0-9];?)*m/) !== null || this.isIndependentReset();
+  }
+
+  isIndependentReset(): boolean {
+    return this.str === '\x1bc';
   }
   
   sgrCodes(): number[] | null {
     if (!this.isSgrCode()) { return null; }
+    if (this.isIndependentReset()) { return [0]; }
     const match = this.str.match(/^\x1b\[(.*)m/);
     return match![1].split(';').map(s => s === '' ? 0 : parseInt(s, 10));
   }

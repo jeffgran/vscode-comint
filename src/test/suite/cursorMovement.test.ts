@@ -88,27 +88,42 @@ suite('ComintBuffer #applyChunk', () => {
 		cm.applyChunk(input3);
 		assert.deepEqual(Buffer.from(cm.content).toString(), '');
 		assert.strictEqual(cm.writeIndex, 0);
+		assert.deepEqual(cm.sgrSegments, []);
+		
 		
 		const input4 = '\r\nup to date.';
 		cm.applyChunk(input4);
 		assert.deepEqual(Buffer.from(cm.content).toString(), '\nup to date.');
+		assert.deepEqual(cm.sgrSegments, []);
 	});
 	
 
 	// to fix: codes 2K, 1G, and unicode char size
 	test ('ESC[2K and ESC[1G and 3-byte utf8 chars (npm rebuild)', () => {
 		const cm = new ComintBuffer('name', vscode.Uri.parse('comint:/'));
+
 		const input1 = '\x1b[36m⠋\x1b[39m Searching dependency tree';
 		cm.applyChunk(input1);
 		assert.deepEqual(Buffer.from(cm.content).toString(), '⠋ Searching dependency tree');
-
 		assert.deepEqual(cm.sgrSegments, [
 			{ code: 36, startIndex: 0, endIndex: 0 }
 		]);
+		
+		const input2 = '\x1b[2K';
+		cm.applyChunk(input2);
+		assert.deepEqual(Buffer.from(cm.content).toString(), '');
+		assert.deepEqual(cm.sgrSegments, []);
+
+		const input3 = '\x1b[1G\x1b[36m⠙\x1b[39m Searching dependency tree';
+		cm.applyChunk(input3);
+		assert.deepEqual(Buffer.from(cm.content).toString(), '⠙ Searching dependency tree');
+		assert.deepEqual(cm.sgrSegments, [
+			{ code: 36, startIndex: 0, endIndex: 0 }
+		]);
+		
 	});
 	
-	// '\x1b[36m⠋\x1b[39m Searching dependency tree'
-	// '\x1b[2K'
+	// 
 	// '\x1b[1G\x1b[36m⠙\x1b[39m Searching dependency tree'
 	// '\x1b[2K'
 	// '/x1b[1G/x1b[36m⠹/x1b[39m Building module: node-pty, Completed: 0'
