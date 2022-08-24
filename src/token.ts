@@ -5,7 +5,7 @@ export class Token {
   str: string;
   startIndex: number;
   endIndex: number;
-
+  
   constructor(one: RegExpExecArray);
   constructor(one: string, startIndex: number, endIndex: number);
   
@@ -29,6 +29,18 @@ export class Token {
     return this.str.startsWith('\r') && this.str.endsWith('\r');
   }
   
+  // Cursor Horizontal Absolute
+  isCHA(): boolean {
+    return this.str.match(/\x1b\[[0-9]*G/) !== null;
+  }
+  
+  n(): number | undefined {
+    let match = this.str.match(/^\x1b\[([0-9]*)/);
+    if (match && match[1].length) {
+      return parseInt(match[1], 10);
+    }
+  }
+  
   isKillLine(): boolean {
     return this.str === '\x1b\[K' || this.str === '\x1b\[0K';
   }
@@ -48,7 +60,7 @@ export class Token {
   isSgrCode(): boolean {
     return this.str.match(/^\x1b\[([0-9];?)*m/) !== null || this.isIndependentReset();
   }
-
+  
   isIndependentReset(): boolean {
     return this.str === '\x1bc';
   }

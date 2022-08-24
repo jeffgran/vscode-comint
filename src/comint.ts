@@ -79,9 +79,6 @@ type TextObject = {
   text: string
 };
 
-// TODO needs to be configurable.
-const promptRegex = /^[^#$%>\n]*[#$%>] */;
-
 export class Comint {
   _shellCount: number = 0;
   _memFs = new MemFS();
@@ -197,11 +194,10 @@ export class Comint {
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const rangeToReplace = comintBuffer.lastPromptInputRange();
     comintBuffer.decrementInputRingIndex();
-    //comintBuffer.replaceRange(rangeToReplace, comintBuffer.getInputRingInput(), editor.document);
     edit.replace(rangeToReplace, comintBuffer.getInputRingInput());
 
-    // kill the selection
-    editor.selections = editor.selections.map((selection) => new vscode.Selection(selection.active, selection.active));
+    // kill the selection (doesn't work)
+    //editor.selections = editor.selections.map((selection) => new vscode.Selection(selection.active, selection.active));
   };
   
   inputRingNext = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
@@ -213,8 +209,8 @@ export class Comint {
     comintBuffer.incrementInputRingIndex();
     edit.replace(rangeToReplace, comintBuffer.getInputRingInput());
     
-    // kill the selection
-    editor.selections = editor.selections.map((selection) => new vscode.Selection(selection.active, selection.active));
+    // kill the selection (doesn't work)
+    //editor.selections = editor.selections.map((selection) => new vscode.Selection(selection.active, selection.active));
   };
   
   _handleMemfsFileChangeEvents = (events: vscode.FileChangeEvent[]) => {
@@ -251,20 +247,8 @@ export class Comint {
     //console.log('fulltext:', e.document.getText());
     
     const comintBuffer = this._memFs.getComintBuffer(e.document.uri);
+    comintBuffer.updatePromptRanges();
     
-    const ranges: vscode.Range[] = [];
-    // TODO be more efficient here and only replace the ranges for the 
-    // parts of the document that changed.
-    for(let i = 0; i < e.document.lineCount; i++) {
-      const line = e.document.lineAt(i);
-      const match = line.text.match(promptRegex);
-      if (match) {
-        const len = match[0].length;
-        const startpos = line.range.start;
-        ranges.push(new vscode.Range(startpos, new vscode.Position(line.lineNumber, len)));
-      }
-    }
-    comintBuffer.setPromptRanges(ranges);
     vscode.commands.executeCommand('comint.setDecorations', e.document.uri);
     vscode.commands.executeCommand('comint.stickyBottom', e.document.uri);
   };

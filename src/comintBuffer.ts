@@ -19,7 +19,7 @@ export class ComintBuffer implements vscode.FileStat {
   name: string;
   content: string = '';
   proc?: IPty;
-  promptRanges: vscode.Range[];
+  promptRanges: [number, number][];
   
   inCR: boolean = false;
   openSgrSegments: SgrSegment[] = [];
@@ -117,6 +117,9 @@ export class ComintBuffer implements vscode.FileStat {
       }
     } else if (token.isKillWholeLine()) {
       this.delete(this.content.lastIndexOf('\n') + 1, this.content.length - 1);
+    } else if (token.isCHA()) {
+      const n = token.n() || 1;
+      this.writeIndex = this.content.slice(0, this.writeIndex).lastIndexOf('\n') + n;
     } else if (token.isSgrCode()) {
       nextSgrSegments.push(...this.processSgrCodes(token));
       this.inCR = false;
@@ -167,15 +170,25 @@ export class ComintBuffer implements vscode.FileStat {
     return ret;
   }
   
-  addPromptRange(range: vscode.Range) {
-    this.promptRanges.push(range);
-  }
-  
   getPromptRanges(): vscode.Range[] {
-    return this.promptRanges;
+    if (this.editor === undefined) { return []; }
+    
+    return this.promptRanges.map(([start, end]) => {
+      return new vscode.Range( this.editor!.document.positionAt(start), this.editor!.document.positionAt(end));
+    });
   }
   
-  setPromptRanges(ranges: vscode.Range[]) {
+  updatePromptRanges() {
+    const ranges: [number, number][] = [];
+    let match: RegExpExecArray | null;
+    
+    const promptRegexStr = vscode.workspace.getConfiguration('comint').get('promptRegex', '');
+    const promptRegex = new RegExp(`${promptRegexStr}`, 'mg');
+    while((match = promptRegex.exec(this.content)) !== null) {
+      const startpos = match.index;
+      const endpos = startpos + match[0].length;
+      ranges.push([startpos, endpos]);
+    }
     this.promptRanges = ranges;
   }
   
@@ -227,7 +240,7 @@ export class ComintBuffer implements vscode.FileStat {
       return this.editor.selection;
     }
     const lastPrompt = ranges[ranges.length - 1];
-    return new vscode.Range(new vscode.Position(lastPrompt.end.line, lastPrompt.end.character), this.editor.document.lineAt(this.editor.document.lineCount - 1).range.end);
+    return new vscode.Range(lastPrompt.end, this.editor.document.lineAt(this.editor.document.lineCount - 1).range.end);
   }
   
   delete(startIndex: number, endIndex: number) {

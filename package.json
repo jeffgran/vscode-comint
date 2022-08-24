@@ -33,6 +33,11 @@
           "items": "string",
           "default": ["stty -echo"],
           "description": "A list of commands to run after starting a shell, to initialize it."
+        },
+        "comint.promptRegex": {
+          "type": "regex",
+          "default": "^[^#$%>\n]*[#$%>] *",
+          "description": "A Regular expression to recognize the prompt of the shell."
         }
       }
     },
