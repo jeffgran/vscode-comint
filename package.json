@@ -25,13 +25,18 @@
         "comint.shellFileArgs": {
           "type": "array",
           "items": "string",
-          "default": ["-c", "bind 'set enable-bracketed-paste off' 2>/dev/null; bash"],
+          "default": [
+            "-c",
+            "bind 'set enable-bracketed-paste off' 2>/dev/null; bash"
+          ],
           "description": "The arguments to pass to the shell command"
         },
         "comint.shellInitCommands": {
           "type": "array",
           "items": "string",
-          "default": ["stty -echo"],
+          "default": [
+            "stty -echo"
+          ],
           "description": "A list of commands to run after starting a shell, to initialize it."
         },
         "comint.promptRegex": {

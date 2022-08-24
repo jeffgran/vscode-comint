@@ -7,8 +7,9 @@ import { Comint } from './comint';
 // - make the prompt detection more performant
 //   - only keep track of the last one? that's all we need really...
 // - input ring should have an empty item at the end/beginning
-//   -integrate input ring with history file
+//   - integrate input ring with history file
 // - password prompt
+// - don't use .sh because it adds weird syntax highlighting
 
 const comint = new Comint();
 
