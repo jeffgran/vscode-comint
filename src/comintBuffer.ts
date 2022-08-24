@@ -40,7 +40,7 @@ export class ComintBuffer implements vscode.FileStat {
     this._inputRing = [];
     this.uri = uri;
   }
-
+  
   get data(): Uint8Array {
     return Buffer.from(this.content);
   }
@@ -49,7 +49,12 @@ export class ComintBuffer implements vscode.FileStat {
     console.log('startComint');
     this.editor = editor;
     
-    this.proc = spawn("/bin/bash", ["-c", "bind 'set enable-bracketed-paste off' 2>/dev/null; /opt/homebrew/bin/bash"], {
+    const shellFile = vscode.workspace.getConfiguration('comint').get('shellFile', 'bash');
+    const shellFileArgs = vscode.workspace.getConfiguration('comint').get('shellFileArgs', []);
+    const initCommands = vscode.workspace.getConfiguration('comint').get('shellInitCommands', []);
+    
+    
+    this.proc = spawn(shellFile, shellFileArgs, {
       name: 'xterm-color',
       cols: 80,
       rows: 30,
@@ -57,8 +62,9 @@ export class ComintBuffer implements vscode.FileStat {
       env: process.env
     });
     
-    // TODO more general/configurable solution for these extras to set the shell up right
-    this.proc.write("stty -echo\n");
+    initCommands.forEach(c => {
+      this.proc?.write(`${c}\n`);
+    });
     
     this.proc.onData(this.applyChunk.bind(this));
   }
@@ -85,7 +91,7 @@ export class ComintBuffer implements vscode.FileStat {
     tokens.forEach(token => {
       this.sgrSegments.push(...this.handleToken(token, chunkString));
     });
-
+    
     // console.log('this.sgrSegments', JSON.stringify(this.sgrSegments));
     // console.log('this.openSgrSegments', JSON.stringify(this.openSgrSegments));
     
@@ -274,7 +280,7 @@ export class ComintBuffer implements vscode.FileStat {
     const endIndex = (atIndex + value.length) - 1;
     
     const deleteIndexes: number[] = [];
-
+    
     this.sgrSegments.forEach((segment, i) => {
       if (segment.startIndex >= atIndex && segment.endIndex <= endIndex) {
         // wholly contained in the deleted section

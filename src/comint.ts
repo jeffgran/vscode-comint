@@ -199,6 +199,9 @@ export class Comint {
     comintBuffer.decrementInputRingIndex();
     //comintBuffer.replaceRange(rangeToReplace, comintBuffer.getInputRingInput(), editor.document);
     edit.replace(rangeToReplace, comintBuffer.getInputRingInput());
+
+    // kill the selection
+    editor.selections = editor.selections.map((selection) => new vscode.Selection(selection.active, selection.active));
   };
   
   inputRingNext = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
@@ -208,8 +211,10 @@ export class Comint {
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const rangeToReplace = comintBuffer.lastPromptInputRange();
     comintBuffer.incrementInputRingIndex();
-    //comintBuffer.replaceRange(rangeToReplace, comintBuffer.getInputRingInput(), editor.document);
     edit.replace(rangeToReplace, comintBuffer.getInputRingInput());
+    
+    // kill the selection
+    editor.selections = editor.selections.map((selection) => new vscode.Selection(selection.active, selection.active));
   };
   
   _handleMemfsFileChangeEvents = (events: vscode.FileChangeEvent[]) => {

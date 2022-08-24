@@ -8,9 +8,7 @@ import { Comint } from './comint';
 //   - only keep track of the last one? that's all we need really...
 // - input ring should have an empty item at the end/beginning
 //   -integrate input ring with history file
-// - ANSI-color-for-comint-mode
-//   - first handle \r better
-// - pasword prompt
+// - password prompt
 
 const comint = new Comint();
 

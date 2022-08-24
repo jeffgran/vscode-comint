@@ -14,6 +14,28 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "configuration": {
+      "title": "ComInt",
+      "properties": {
+        "comint.shellFile": {
+          "type": "string",
+          "default": "bash",
+          "description": "The absolute path or name of the shell executable to run."
+        },
+        "comint.shellFileArgs": {
+          "type": "array",
+          "items": "string",
+          "default": ["-c", "bind 'set enable-bracketed-paste off' 2>/dev/null; bash"],
+          "description": "The arguments to pass to the shell command"
+        },
+        "comint.shellInitCommands": {
+          "type": "array",
+          "items": "string",
+          "default": ["stty -echo"],
+          "description": "A list of commands to run after starting a shell, to initialize it."
+        }
+      }
+    },
     "keybindings": [
       {
         "command": "comint.sendInput",
