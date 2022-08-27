@@ -1,6 +1,7 @@
 import * as vscode from 'vscode';
 import {IPty, spawn} from 'node-pty';
 import { Token, tokenRe } from './token';
+import { passwordPrompt } from './passwordPrompt';
 
 export type SgrSegment = {
   code: number,
@@ -15,21 +16,21 @@ export class ComintBuffer implements vscode.FileStat {
   size: number;
   uri: vscode.Uri;
   editor?: vscode.TextEditor;
-  
+
   name: string;
   content: string = '';
   proc?: IPty;
   promptRanges: [number, number][];
-  
+
   inCR: boolean = false;
   openSgrSegments: SgrSegment[] = [];
   writeIndex: number = 0;
-  
+
   sgrSegments: SgrSegment[] = [];
-  
+
   _inputRing: string[];
   _inputRingIndex: number = 0;
-  
+
   constructor(name: string, uri: vscode.Uri) {
     this.type = vscode.FileType.File;
     this.ctime = Date.now();
@@ -40,20 +41,20 @@ export class ComintBuffer implements vscode.FileStat {
     this._inputRing = [];
     this.uri = uri;
   }
-  
+
   get data(): Uint8Array {
     return Buffer.from(this.content);
   }
-  
+
   startComint(uri: vscode.Uri, editor: vscode.TextEditor) {
     console.log('startComint');
     this.editor = editor;
-    
+
     const shellFile = vscode.workspace.getConfiguration('comint').get('shellFile', 'bash');
     const shellFileArgs = vscode.workspace.getConfiguration('comint').get('shellFileArgs', []);
     const initCommands = vscode.workspace.getConfiguration('comint').get('shellInitCommands', []);
-    
-    
+
+
     this.proc = spawn(shellFile, shellFileArgs, {
       name: 'xterm-color',
       cols: 80,
@@ -61,19 +62,19 @@ export class ComintBuffer implements vscode.FileStat {
       cwd: this._rootPath(),
       env: process.env
     });
-    
+
     initCommands.forEach(c => {
       this.proc?.write(`${c}\n`);
     });
-    
+
     this.proc.onData(this.applyChunk.bind(this));
   }
-  
-  applyChunk(chunkString: string) {
+
+  applyChunk(chunkString: string): Thenable<string | undefined> | undefined {
     //console.log('[proc.onData] new data:', chunkString.replace(/\r/g, "/r").replace(/\n/g, "/n\n").replace(/\x1b/g, '/x1b'));
     //console.log('[proc.onData] new data raw:', Buffer.from(chunkString));
     let match: RegExpExecArray | null;
-    
+
     let lastTokenEndIndex = -1;
     const tokens: Token[] = [];
     while((match = tokenRe.exec(chunkString)) !== null) {
@@ -87,20 +88,22 @@ export class ComintBuffer implements vscode.FileStat {
     if (lastTokenEndIndex < chunkString.length - 1) {
       tokens.push(new Token(chunkString.slice(lastTokenEndIndex + 1, chunkString.length), lastTokenEndIndex + 1, chunkString.length - 1));
     }
-    
+
     tokens.forEach(token => {
       this.sgrSegments.push(...this.handleToken(token, chunkString));
     });
-    
+
     // console.log('this.sgrSegments', JSON.stringify(this.sgrSegments));
     // console.log('this.openSgrSegments', JSON.stringify(this.openSgrSegments));
-    
+
     this._sync(true);
+
+    return this.checkForPasswordPrompt();
   }
-  
+
   handleToken(token: Token, chunkString: string): SgrSegment[] {
     const nextSgrSegments: SgrSegment[] = [];
-    
+
     console.log(`token: ${token.str}, ${new Uint8Array(Buffer.from(token.str))} - startIndex:${token.startIndex}, endIndex: ${token.endIndex}`);
     if (token.isCrlfSequence()) {
       this.inCR = false;
@@ -135,7 +138,7 @@ export class ComintBuffer implements vscode.FileStat {
     }
     return nextSgrSegments;
   }
-  
+
   processSgrCodes(token: Token): SgrSegment[] {
     const sgrcodes = token.sgrCodes();
     console.log('sgrCodes:', sgrcodes);
@@ -149,7 +152,7 @@ export class ComintBuffer implements vscode.FileStat {
         this.openSgrSegments = [];
       } else if (sgrcode === 39) { // "default foreground"
         this.openSgrSegments.filter((s, i)=> {
-          const ret = s.code >= 30 && s.code <= 38;
+          const ret: boolean = s.code >= 30 && s.code <= 38;
           if (ret) {
             this.openSgrSegments.splice(i, 1);
           }
@@ -158,7 +161,7 @@ export class ComintBuffer implements vscode.FileStat {
           s.endIndex = this.writeIndex - 1;
           ret.push(s);
         });
-        
+
       } else {
         this.openSgrSegments.push({
           code: sgrcode,
@@ -169,19 +172,19 @@ export class ComintBuffer implements vscode.FileStat {
     });
     return ret;
   }
-  
+
   getPromptRanges(): vscode.Range[] {
     if (this.editor === undefined) { return []; }
-    
+
     return this.promptRanges.map(([start, end]) => {
       return new vscode.Range( this.editor!.document.positionAt(start), this.editor!.document.positionAt(end));
     });
   }
-  
+
   updatePromptRanges() {
     const ranges: [number, number][] = [];
     let match: RegExpExecArray | null;
-    
+
     const promptRegexStr = vscode.workspace.getConfiguration('comint').get('promptRegex', '');
     const promptRegex = new RegExp(`${promptRegexStr}`, 'mg');
     while((match = promptRegex.exec(this.content)) !== null) {
@@ -191,7 +194,7 @@ export class ComintBuffer implements vscode.FileStat {
     }
     this.promptRanges = ranges;
   }
-  
+
   pushInput(cmd: string) {
     this.proc?.write(`${cmd}\n`);
     const str = `${cmd}\n`;
@@ -200,41 +203,51 @@ export class ComintBuffer implements vscode.FileStat {
     this._inputRing.push(cmd);
     this._inputRingIndex = this._inputRing.length;
   }
-  
+
   sendChars(chars: string) {
     this.proc?.write(chars);
   }
-  
+
+  checkForPasswordPrompt(): Thenable<string | undefined> | undefined {
+    const m = this.content.match(passwordPrompt);
+    if (m && m.index !== undefined && m.index + m[0].length === this.content.length) {
+      return vscode.window.showInputBox({password: true, title: m[0]}).then(val => {
+        this.proc?.write(val + "\n");
+        return val;
+      });
+    }
+  }
+
   getEndPosition(): vscode.Position {
     if (this.editor === undefined) {
       return new vscode.Position(0, 0);
     }
     return this.editor.document.lineAt(this.editor.document.lineCount - 1).range.end;
   }
-  
+
   getInputRingInput(): string {
     return this._inputRing[this._inputRingIndex] || '';
   }
-  
+
   decrementInputRingIndex() {
     this._inputRingIndex -= 1;
     if (this._inputRingIndex < 0) {
       this._inputRingIndex = this._inputRing.length - 1;
     }
   }
-  
+
   incrementInputRingIndex() {
     this._inputRingIndex += 1;
     if (this._inputRingIndex >= this._inputRing.length) {
       this._inputRingIndex = 0;
     }
   }
-  
+
   lastPromptInputRange(): vscode.Range {
     if (this.editor === undefined) {
       throw new Error('No Editor!');
     }
-    
+
     const ranges = this.getPromptRanges();
     if (ranges.length === 0) {
       return this.editor.selection;
@@ -242,10 +255,10 @@ export class ComintBuffer implements vscode.FileStat {
     const lastPrompt = ranges[ranges.length - 1];
     return new vscode.Range(lastPrompt.end, this.editor.document.lineAt(this.editor.document.lineCount - 1).range.end);
   }
-  
+
   delete(startIndex: number, endIndex: number) {
     this._delete(startIndex, endIndex);
-    
+
     const deleteIndexes: number[] = [];
     const shift = (endIndex - startIndex) + 1;
     this.sgrSegments.forEach((segment, i) => {
@@ -266,19 +279,19 @@ export class ComintBuffer implements vscode.FileStat {
         segment.endIndex -= shift;
       }
     });
-    
+
     deleteIndexes.sort((a,b) => b - a).forEach(i => this.sgrSegments.splice(i, 1));
-    
+
     if (this.writeIndex > startIndex) {
       this.writeIndex -= shift;
     }
-    
+
     this._sync(true);
   }
-  
+
   _sync(revert: boolean = false) {
     if (revert) {
-      // after writing to the underlying virtual file/buffer, immediately 
+      // after writing to the underlying virtual file/buffer, immediately
       // "revert" the textdocument, so it reflects the new data, and doesn't show as "unsaved"
       console.log(`reverting ${this.uri}`);
       if (vscode.window.activeTextEditor === this.editor) {
@@ -288,12 +301,12 @@ export class ComintBuffer implements vscode.FileStat {
       }
     }
   }
-  
+
   write(value: string, atIndex: number): number {
     const endIndex = (atIndex + value.length) - 1;
-    
+
     const deleteIndexes: number[] = [];
-    
+
     this.sgrSegments.forEach((segment, i) => {
       if (segment.startIndex >= atIndex && segment.endIndex <= endIndex) {
         // wholly contained in the deleted section
@@ -306,9 +319,9 @@ export class ComintBuffer implements vscode.FileStat {
         segment.startIndex = endIndex + 1;
       }
     });
-    
+
     deleteIndexes.sort((a,b) => b - a).forEach(i => this.sgrSegments.splice(i, 1));
-    
+
     const headroom = this.content.length - atIndex;
     if (headroom >= value.length) {
       // there's enough room
@@ -320,17 +333,17 @@ export class ComintBuffer implements vscode.FileStat {
       return this.content.length;
     }
   }
-  
+
   _delete(startIndex: number, endIndex: number) {
     if (!this.content) { throw new Error("Tried to delete but there is no data."); }
     if (endIndex < startIndex) { throw new Error(`Invalid indices. startIndex (${startIndex}) is greater than endIndex ${endIndex}.`); }
-    
+
     const sizeToDelete = (endIndex - startIndex) + 1;
     if (sizeToDelete > this.content.length) { throw new Error(`Cannot delete more data than is in the buffer! startIndex: ${startIndex}, endIndex: ${endIndex}, buffer size: ${this.content.length}`); }
-    
+
     this.content = this.content.slice(0, startIndex) + this.content.slice(endIndex+1, this.content.length);
   }
-  
+
   _rootPath() {
     if (!vscode.workspace.workspaceFolders) { return process.env.HOME; }
     return vscode.workspace.workspaceFolders![0].uri.path;

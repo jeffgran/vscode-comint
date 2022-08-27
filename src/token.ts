@@ -5,10 +5,10 @@ export class Token {
   str: string;
   startIndex: number;
   endIndex: number;
-  
+
   constructor(one: RegExpExecArray);
   constructor(one: string, startIndex: number, endIndex: number);
-  
+
   constructor(one: RegExpExecArray | string, startIndex?: number, endIndex?: number) {
     if (typeof one === 'string') {
       this.str = one;
@@ -20,58 +20,58 @@ export class Token {
       this.endIndex = one.index + one[0].length - 1;
     }
   }
-  
+
   isCrlfSequence(): boolean {
     return this.str.startsWith('\r') && this.str.endsWith('\n');
   }
-  
+
   isCrSequence(): boolean {
     return this.str.startsWith('\r') && this.str.endsWith('\r');
   }
-  
+
   // Cursor Horizontal Absolute
   isCHA(): boolean {
     return this.str.match(/\x1b\[[0-9]*G/) !== null;
   }
-  
+
   n(): number | undefined {
     let match = this.str.match(/^\x1b\[([0-9]*)/);
     if (match && match[1].length) {
       return parseInt(match[1], 10);
     }
   }
-  
+
   isKillLine(): boolean {
     return this.str === '\x1b\[K' || this.str === '\x1b\[0K';
   }
-  
+
   isKillLineBackward(): boolean {
     return this.str === '\x1b\[1K';
   }
-  
+
   isKillWholeLine(): boolean {
     return this.str === '\x1b\[2K';
   }
-  
+
   isAnsiCode(): boolean {
     return this.str.startsWith('\x1b');
   }
-  
+
   isSgrCode(): boolean {
     return this.str.match(/^\x1b\[([0-9];?)*m/) !== null || this.isIndependentReset();
   }
-  
+
   isIndependentReset(): boolean {
     return this.str === '\x1bc';
   }
-  
+
   sgrCodes(): number[] | null {
     if (!this.isSgrCode()) { return null; }
     if (this.isIndependentReset()) { return [0]; }
     const match = this.str.match(/^\x1b\[(.*)m/);
     return match![1].split(';').map(s => s === '' ? 0 : parseInt(s, 10));
   }
-  
+
   outputString(): string {
     if (this.isCrlfSequence()) {
       return '\n';

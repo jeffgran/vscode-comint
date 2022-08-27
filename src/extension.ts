@@ -11,7 +11,7 @@ import { Comint } from './comint';
 // - password prompt
 // - don't use .sh because it adds weird syntax highlighting
 
-const comint = new Comint();
+export const comint = new Comint();
 
 export function activate(context: vscode.ExtensionContext) {
 	// Use the console to output diagnostic information (console.log) and errors (console.error)

@@ -64,7 +64,7 @@ const sgrCodeMap = new Map([
   [35, ansiMagentaDecoration],
   [36, ansiCyanDecoration],
   [37, ansiWhiteDecoration],
-  
+
   [90, ansiBrightBlackDecoration],
   [91, ansiBrightRedDecoration],
   [92, ansiBrightGreenDecoration],
@@ -82,34 +82,34 @@ type TextObject = {
 export class Comint {
   _shellCount: number = 0;
   _memFs = new MemFS();
-  
+
   get memFs() { return this._memFs; }
-  
+
   constructor() {
     this._memFs.onDidChangeFile(this._handleMemfsFileChangeEvents);
   }
-  
+
   newShell = () => {
     console.log("comint.newShell");
     const num = this._shellCount;
     this._shellCount += 1;
     this._memFs.writeFile(vscode.Uri.parse(`comint:///comint:shell-${num}.sh`), Buffer.from(''), { create: true, overwrite: true });
   };
-  
+
   type = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit, { text }: TextObject) => {
     console.log('comint.type');
-    if (editor.document.uri.scheme !== "comint") { 
+    if (editor.document.uri.scheme !== "comint") {
       vscode.commands.executeCommand('default:type', {text});
       return;
     }
     // TODO some fancy stuff here?
     vscode.commands.executeCommand('default:type', {text});
   };
-  
+
   sendInput = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
     console.log('comint.sendInput');
     if (editor.document.uri.scheme !== "comint") { return; }
-    
+
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const range = editor.selection;
     let cmd: string;
@@ -125,19 +125,19 @@ export class Comint {
     } else {
       cmd = editor.document.getText(range);
     }
-    
+
     comintBuffer.pushInput(cmd);
   };
-  
+
   sendCtrlC = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
     console.log('comint.sendCtrlC');
     if (editor.document.uri.scheme !== "comint") { return; }
-    
+
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
-    
+
     comintBuffer.sendChars("\x03");
   };
-  
+
   setDecorations = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit, uri: vscode.Uri) => {
     console.log('comint.setDecorations');
     if (editor.document.uri.scheme !== "comint") { return; }
@@ -145,16 +145,16 @@ export class Comint {
       console.log('wrong document!');
       return;
     }
-    
+
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const ranges = comintBuffer.getPromptRanges();
     editor.setDecorations(promptDecoration, ranges);
-    
+
     const allCodes = new Map<number, vscode.Range[]>();
     sgrCodeMap.forEach((decorationType, code) => {
       allCodes.set(code, []);
     });
-    
+
     const sgrSegments = comintBuffer.sgrSegments;
     const sgrRanges = sgrSegments.reduce<Map<number, vscode.Range[]>>((acc, segment) => {
       const range = new vscode.Range(editor.document.positionAt(segment.startIndex), editor.document.positionAt(segment.endIndex + 1));
@@ -168,15 +168,15 @@ export class Comint {
       }
     });
   };
-  
+
   stickyBottom = (editor: vscode.TextEditor, _edit: vscode.TextEditorEdit, uri: vscode.Uri) => {
     console.log('comint.stickyBottom');
     if (editor.document.uri.scheme !== "comint") { return; }
     if (editor.document.uri !== uri) { return; }
-    
+
     editor.revealRange(editor.document.lineAt(editor.document.lineCount - 1).range);
   };
-  
+
   clear = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
     console.log('comint.clear');
     if (editor.document.uri.scheme !== "comint") { return; }
@@ -186,11 +186,11 @@ export class Comint {
     const endByteOffset = Buffer.byteLength(editor.document.getText(rangeToDelete));
     comintBuffer.delete(0, endByteOffset);
   };
-  
+
   inputRingPrevious = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
     console.log('comint.inputRingPrevious');
     if (editor.document.uri.scheme !== "comint") { return; }
-    
+
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const rangeToReplace = comintBuffer.lastPromptInputRange();
     comintBuffer.decrementInputRingIndex();
@@ -199,20 +199,20 @@ export class Comint {
     // kill the selection (doesn't work)
     //editor.selections = editor.selections.map((selection) => new vscode.Selection(selection.active, selection.active));
   };
-  
+
   inputRingNext = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
     console.log('comint.inputRingNext');
     if (editor.document.uri.scheme !== "comint") { return; }
-    
+
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const rangeToReplace = comintBuffer.lastPromptInputRange();
     comintBuffer.incrementInputRingIndex();
     edit.replace(rangeToReplace, comintBuffer.getInputRingInput());
-    
+
     // kill the selection (doesn't work)
     //editor.selections = editor.selections.map((selection) => new vscode.Selection(selection.active, selection.active));
   };
-  
+
   _handleMemfsFileChangeEvents = (events: vscode.FileChangeEvent[]) => {
     console.log('comint._handleMemfsFileChangeEvents');
     events.forEach(async e => {
@@ -223,36 +223,36 @@ export class Comint {
       }
     });
   };
-  
+
   onDidOpenTextDocument = (doc: vscode.TextDocument) => {
     if (doc.uri.scheme !== "comint") { return; }
     console.log("comint.onDidOpenTextDocument");
-    
+
     const comintBuffer = this._memFs.getComintBuffer(doc.uri);
     const e = vscode.window.activeTextEditor;
     if (e !== undefined) {
       comintBuffer.startComint(doc.uri, e);
     }
   };
-  
+
   onDidChangeTextDocument = (e: vscode.TextDocumentChangeEvent) => {
     if (e.document.uri.scheme !== "comint") { return; }
     console.log('comint.onDidChangeTextDocument');
-    
+
     // no content was changed, we can ignore this event.
     if (e.contentChanges.length === 0) { return; }
     e.contentChanges.forEach(cc => {
       //console.log(cc);
     });
     //console.log('fulltext:', e.document.getText());
-    
+
     const comintBuffer = this._memFs.getComintBuffer(e.document.uri);
     comintBuffer.updatePromptRanges();
-    
+
     vscode.commands.executeCommand('comint.setDecorations', e.document.uri);
     vscode.commands.executeCommand('comint.stickyBottom', e.document.uri);
   };
-  
+
   onDidChangeVisibleTextEditors = (e: readonly vscode.TextEditor[]) => {
     e.forEach(editor => {
       if (editor.document.uri.scheme === 'comint') {
@@ -266,7 +266,7 @@ export class Comint {
       }
     });
   };
-  
+
   onDidChangeTextEditorSelection = (e: vscode.TextEditorSelectionChangeEvent) => {
     if (e.selections.length < 1) { return; }
     const selection = e.selections[0];

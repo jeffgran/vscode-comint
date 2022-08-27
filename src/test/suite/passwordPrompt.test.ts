@@ -1,4 +1,6 @@
 import * as assert from 'assert';
+import { ComintBuffer } from '../../comintBuffer';
+import * as vscode from 'vscode';
 
 import {passwordPrompt} from '../../passwordPrompt';
 
@@ -22,10 +24,14 @@ const comintTestPasswordStrings = [
   "Enter password:",
   "Enter Auth Password:", // OpenVPN (Bug#35724)
   "Mot de Passe :", // localized (Bug#29729)
-  "Passwort:" // localized
+  "Passwort:", // localized
+  "Password:"
 ];
 
-console.log(passwordPrompt);
+
+const sleep = (milliseconds: number) => {
+  return new Promise(resolve => setTimeout(resolve, milliseconds));
+};
 
 suite('passwordPrompt', () => {
   comintTestPasswordStrings.forEach(passwordString => {
@@ -33,5 +39,16 @@ suite('passwordPrompt', () => {
       const match = passwordString.match(passwordPrompt);
       assert.ok(match);
     });
+  });
+
+  test('integration', (done) => {
+    const cm = new ComintBuffer('name', vscode.Uri.parse('comint://name.sh'));
+    const ret = cm.applyChunk('Password:')?.then((val) => {
+      assert.equal(val, '');
+      done();
+    });
+    sleep(1000);
+    // can't figure out a way to actually enter text. but we can "accept", i.e. press return and send an empty password
+    vscode.commands.executeCommand('workbench.action.acceptSelectedQuickOpenItem');
   });
 });

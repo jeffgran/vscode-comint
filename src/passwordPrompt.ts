@@ -107,4 +107,4 @@ const f0r = "(?: \\w+ .+)?[ \\t]*[:：៖]\\s*";
 //    "\\|^Enter encryption key: (repeat) *\\'")
 const ccrypt = "|^Enter encryption key: (repeat) *";
 
-export const passwordPrompt = new RegExp(`${intros}${passwordWords}${again}${f0r}${ccrypt}`, 'i');
+export const passwordPrompt = new RegExp(`${intros}${passwordWords}${again}${f0r}${ccrypt}`, 'im');
