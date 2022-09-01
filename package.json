@@ -14,6 +14,13 @@
   ],
   "main": "./out/extension.js",
   "contributes": {
+    "languages": [
+      {
+        "id": "comint",
+        "extensions": [".comint"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
     "configuration": {
       "title": "ComInt",
       "properties": {

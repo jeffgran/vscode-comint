@@ -93,7 +93,7 @@ export class Comint {
     console.log("comint.newShell");
     const num = this._shellCount;
     this._shellCount += 1;
-    this._memFs.writeFile(vscode.Uri.parse(`comint:///comint:shell-${num}.sh`), Buffer.from(''), { create: true, overwrite: true });
+    this._memFs.writeFile(vscode.Uri.parse(`comint:///bash-${num}.comint`), Buffer.from(''), { create: true, overwrite: true });
   };
 
   type = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit, { text }: TextObject) => {
@@ -111,22 +111,7 @@ export class Comint {
     if (editor.document.uri.scheme !== "comint") { return; }
 
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
-    const range = editor.selection;
-    let cmd: string;
-    if (editor.selection.isEmpty) {
-      const line = editor.document.lineAt(editor.selection.end);
-      const prompts = comintBuffer.getPromptRanges();
-      const intersection = prompts.map(p => line.range.intersection(p)).find(p => p);
-      if (intersection) {
-        cmd = editor.document.getText(new vscode.Range(intersection.end, line.range.end));
-      } else {
-        cmd = line.text;
-      }
-    } else {
-      cmd = editor.document.getText(range);
-    }
-
-    comintBuffer.pushInput(cmd);
+    comintBuffer.pushInput();
   };
 
   sendCtrlC = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {

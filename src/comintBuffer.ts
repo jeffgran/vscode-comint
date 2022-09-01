@@ -28,6 +28,8 @@ export class ComintBuffer implements vscode.FileStat {
 
   sgrSegments: SgrSegment[] = [];
 
+  outputCallback?: ((data: string) => void);
+
   _inputRing: string[];
   _inputRingIndex: number = 0;
 
@@ -67,7 +69,15 @@ export class ComintBuffer implements vscode.FileStat {
       this.proc?.write(`${c}\n`);
     });
 
-    this.proc.onData(this.applyChunk.bind(this));
+    this.proc.onData(this.dispatchData.bind(this));
+  }
+
+  dispatchData(data: string) {
+    if (this.outputCallback !== undefined) {
+      this.outputCallback(data);
+    } else {
+      this.applyChunk(data);
+    }
   }
 
   applyChunk(chunkString: string): Thenable<string | undefined> | undefined {
@@ -99,6 +109,22 @@ export class ComintBuffer implements vscode.FileStat {
     this._sync(true);
 
     return this.checkForPasswordPrompt();
+  }
+
+  withRedirection(cmd: string, cb: (data: string) => void): Promise<void> {
+    return new Promise((resolve) => {
+      this.outputCallback = (data: string) => {
+        if (data.slice(data.lastIndexOf('\n')+1).match(this.promptRegex())) {
+          cb(data.slice(0, data.lastIndexOf('\n')));
+          console.log('resolving');
+          this.outputCallback = undefined;
+          resolve();
+        } else {
+          cb(data);
+        }
+      };
+      this.sendChars(cmd);
+    });
   }
 
   handleToken(token: Token, chunkString: string): SgrSegment[] {
@@ -173,6 +199,11 @@ export class ComintBuffer implements vscode.FileStat {
     return ret;
   }
 
+  promptRegex(): RegExp {
+    const promptRegexStr = vscode.workspace.getConfiguration('comint').get('promptRegex', '');
+    return new RegExp(`${promptRegexStr}`, 'mg');
+  }
+
   getPromptRanges(): vscode.Range[] {
     if (this.editor === undefined) { return []; }
 
@@ -184,10 +215,8 @@ export class ComintBuffer implements vscode.FileStat {
   updatePromptRanges() {
     const ranges: [number, number][] = [];
     let match: RegExpExecArray | null;
-
-    const promptRegexStr = vscode.workspace.getConfiguration('comint').get('promptRegex', '');
-    const promptRegex = new RegExp(`${promptRegexStr}`, 'mg');
-    while((match = promptRegex.exec(this.content)) !== null) {
+    const pre = this.promptRegex()
+    while((match = pre.exec(this.content)) !== null) {
       const startpos = match.index;
       const endpos = startpos + match[0].length;
       ranges.push([startpos, endpos]);
@@ -195,13 +224,34 @@ export class ComintBuffer implements vscode.FileStat {
     this.promptRanges = ranges;
   }
 
-  pushInput(cmd: string) {
+  pushInput() {
+    const cmd = this.getInput();
     this.proc?.write(`${cmd}\n`);
     const str = `${cmd}\n`;
     this.writeIndex = this.write(str, this.content.length);
     this._sync(true);
     this._inputRing.push(cmd);
     this._inputRingIndex = this._inputRing.length;
+  }
+
+  getInput(): string {
+    if (this.editor === undefined) { return ''; }
+
+    const range = this.editor.selection;
+    let cmd: string;
+    if (this.editor.selection.isEmpty) {
+      const line = this.editor.document.lineAt(this.editor.selection.end);
+      const prompts = this.getPromptRanges();
+      const intersection = prompts.map(p => line.range.intersection(p)).find(p => p);
+      if (intersection) {
+        cmd = this.editor.document.getText(new vscode.Range(intersection.end, line.range.end));
+      } else {
+        cmd = line.text;
+      }
+    } else {
+      cmd = this.editor.document.getText(range);
+    }
+    return cmd;
   }
 
   sendChars(chars: string) {

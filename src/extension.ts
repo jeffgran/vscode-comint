@@ -1,15 +1,20 @@
 import * as vscode from 'vscode';
 import { Comint } from './comint';
+import { ComintCompletionProvider } from './completion';
 
 // TODO
 // - kill the process when closing the document.
+//   - warn that the process will be killed before closing the document
 // - keep track of the insertion point so we can keep the user input if more output comes
 // - make the prompt detection more performant
 //   - only keep track of the last one? that's all we need really...
 // - input ring should have an empty item at the end/beginning
 //   - integrate input ring with history file
-// - password prompt
-// - don't use .sh because it adds weird syntax highlighting
+// - finish ansi/sgr - background colors, underline/etc styles
+// - tab completion
+//   ∆ bash
+//   - zsh
+//   - generic (python etc?)
 
 export const comint = new Comint();
 
@@ -32,7 +37,12 @@ export function activate(context: vscode.ExtensionContext) {
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.clear', comint.clear));
 	context.subscriptions.push(vscode.commands.registerTextEditorCommand('comint.sendCtrlC', comint.sendCtrlC));
 
-	context.subscriptions.push(vscode.commands.registerTextEditorCommand('type', comint.type));
+	// Not sure if this will be needed.
+	// context.subscriptions.push(vscode.commands.registerTextEditorCommand('type', comint.type));
+
+	// comint "language"
+	context.subscriptions.push(vscode.languages.registerCompletionItemProvider({scheme: 'comint'}, new ComintCompletionProvider(comint._memFs), '.', '/', '$', ' '));
+
 
 	// event callbacks
 	// context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(comint.onDidChangeWorkspaceFolders));
