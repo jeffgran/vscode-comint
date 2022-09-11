@@ -189,6 +189,18 @@ export class ComintBuffer implements vscode.FileStat {
           ret.push(s);
         });
 
+      } else if (sgrcode === 49) { // "default background"
+        this.openSgrSegments.filter((s, i)=> {
+          const ret: boolean = s.code >= 40 && s.code <= 48;
+          if (ret) {
+            this.openSgrSegments.splice(i, 1);
+          }
+          return ret;
+        }).forEach(s => {
+          s.endIndex = this.writeIndex - 1;
+          ret.push(s);
+        });
+
       } else {
         this.openSgrSegments.push({
           code: sgrcode,

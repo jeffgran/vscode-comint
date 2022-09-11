@@ -4,14 +4,23 @@ import { Comint } from './comint';
 import { ComintCompletionProvider } from './completion';
 
 // TODO
-// - kill the process when closing the document.
+// - kill the process when closing the document?
 //   - warn that the process will be killed before closing the document
+//   - OR: add feature to re-open closed shells?
 // - keep track of the insertion point so we can keep the user input if more output comes
-// - make the prompt detection more performant
+// - make the prompt detection more performant?
 //   - only keep track of the last one? that's all we need really...
+// - prompt: keep track of which ranges were output vs input, to help with cases like:
+//   | `Do you want to continue? [y/N] Do you want to continue? [y/N] y`
+//   | `bash: Do: command not found`
 // - input ring should have an empty item at the end/beginning
 //   - integrate input ring with history file
-// - finish ansi/sgr - background colors, underline/etc styles
+//   - don't select input after switching input ring
+//   - go-to-beg/end of input ring command
+//   - (ctrl-r)
+// - ansi/sgr
+//   - underline/italic/strikethrough/etc styles
+//     - improve "paired" on/off codes for dryness
 // - tab completion
 //   ∆ bash
 //   - zsh

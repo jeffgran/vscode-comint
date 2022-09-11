@@ -55,7 +55,80 @@ const ansiBrightWhiteDecoration = vscode.window.createTextEditorDecorationType({
   color: new vscode.ThemeColor('terminal.ansiBrightWhite'),
 });
 
+const ansiBlackBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiBlack'),
+});
+const ansiRedBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiRed'),
+});
+const ansiGreenBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiGreen'),
+});
+const ansiYellowBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiYellow'),
+});
+const ansiBlueBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiBlue'),
+});
+const ansiMagentaBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiMagenta'),
+});
+const ansiCyanBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiCyan'),
+});
+const ansiWhiteBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiWhite'),
+});
+const ansiBrightBlackBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiBrightBlack'),
+});
+const ansiBrightRedBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiBrightRed'),
+});
+const ansiBrightGreenBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiBrightGreen'),
+});
+const ansiBrightYellowBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiBrightYellow'),
+});
+const ansiBrightBlueBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiBrightBlue'),
+});
+const ansiBrightMagentaBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiBrightMagenta'),
+});
+const ansiBrightCyanBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiBrightCyan'),
+});
+const ansiBrightWhiteBackgroundDecoration = vscode.window.createTextEditorDecorationType({
+  backgroundColor: new vscode.ThemeColor('terminal.ansiBrightWhite'),
+});
+
 const sgrCodeMap = new Map([
+  //[1, bold],
+  //[2, faint],
+  //[3, italic],
+  //[4, underline],
+  //[4, underline],
+  //[5, slowBlink],
+  //[6, fastBlink],
+  //[7, inverted],
+  //[8, conceal],
+  //[9, strikethrough],
+
+  //[10, defaultFont],
+  //[11-19, altFont],
+  //[20, gothic],
+
+  //[21, doubleUnderline],
+  //[22, notBoldNorFaint],
+  //[23, notItalic],
+  //[24, notUnderline],
+  //[25, notBlinking],
+  //[27, notInverted],
+  //[28, notConcealed],
+  //[29, notStrikethrough],
+
   [30, ansiBlackDecoration],
   [31, ansiRedDecoration],
   [32, ansiGreenDecoration],
@@ -65,6 +138,15 @@ const sgrCodeMap = new Map([
   [36, ansiCyanDecoration],
   [37, ansiWhiteDecoration],
 
+  [40, ansiBlackBackgroundDecoration],
+  [41, ansiRedBackgroundDecoration],
+  [42, ansiGreenBackgroundDecoration],
+  [43, ansiYellowBackgroundDecoration],
+  [44, ansiBlueBackgroundDecoration],
+  [45, ansiMagentaBackgroundDecoration],
+  [46, ansiCyanBackgroundDecoration],
+  [47, ansiWhiteBackgroundDecoration],
+
   [90, ansiBrightBlackDecoration],
   [91, ansiBrightRedDecoration],
   [92, ansiBrightGreenDecoration],
@@ -73,6 +155,15 @@ const sgrCodeMap = new Map([
   [95, ansiBrightMagentaDecoration],
   [96, ansiBrightCyanDecoration],
   [97, ansiBrightWhiteDecoration],
+
+  [100, ansiBrightBlackBackgroundDecoration],
+  [101, ansiBrightRedBackgroundDecoration],
+  [102, ansiBrightGreenBackgroundDecoration],
+  [103, ansiBrightYellowBackgroundDecoration],
+  [104, ansiBrightBlueBackgroundDecoration],
+  [105, ansiBrightMagentaBackgroundDecoration],
+  [106, ansiBrightCyanBackgroundDecoration],
+  [107, ansiBrightWhiteBackgroundDecoration],
 ]);
 
 type TextObject = {
