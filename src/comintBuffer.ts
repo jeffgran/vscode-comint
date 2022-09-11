@@ -1,5 +1,7 @@
 import * as vscode from 'vscode';
-import {IPty, spawn} from 'node-pty';
+
+import {getCoreNodeModule} from './getCoreNodeModule';
+const {spawn} = getCoreNodeModule('node-pty');
 import { Token, tokenRe } from './token';
 import { passwordPrompt } from './passwordPrompt';
 
@@ -19,7 +21,7 @@ export class ComintBuffer implements vscode.FileStat {
 
   name: string;
   content: string = '';
-  proc?: IPty;
+  proc?: any; // not sure how to import typings from the core module
   promptRanges: [number, number][];
 
   inCR: boolean = false;
@@ -55,7 +57,6 @@ export class ComintBuffer implements vscode.FileStat {
     const shellFile = vscode.workspace.getConfiguration('comint').get('shellFile', 'bash');
     const shellFileArgs = vscode.workspace.getConfiguration('comint').get('shellFileArgs', []);
     const initCommands = vscode.workspace.getConfiguration('comint').get('shellInitCommands', []);
-
 
     this.proc = spawn(shellFile, shellFileArgs, {
       name: 'xterm-color',
@@ -215,7 +216,7 @@ export class ComintBuffer implements vscode.FileStat {
   updatePromptRanges() {
     const ranges: [number, number][] = [];
     let match: RegExpExecArray | null;
-    const pre = this.promptRegex()
+    const pre = this.promptRegex();
     while((match = pre.exec(this.content)) !== null) {
       const startpos = match.index;
       const endpos = startpos + match[0].length;

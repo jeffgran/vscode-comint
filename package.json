@@ -1,7 +1,7 @@
 {
   "name": "comint",
   "displayName": "ComInt: Shell in a TextEditor",
-  "description": "",
+  "description": "Inspired by Emacs' comint-mode. Your keyboard shortcuts all work because it's just a regular text editor, with a shell inside.",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.69.0"
@@ -17,7 +17,9 @@
     "languages": [
       {
         "id": "comint",
-        "extensions": [".comint"],
+        "extensions": [
+          ".comint"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -98,11 +100,26 @@
       {
         "command": "comint.inputRingPrevious",
         "title": "Comint Input Ring Previous"
+      },
+      {
+        "command": "comint.inputRingNext",
+        "title": "Comint Input Ring Next"
+      },
+      {
+        "command": "comint.sendInput",
+        "title": "Comint Send Input"
+      },
+      {
+        "command": "comint.sendCtrlC",
+        "title": "Comint Send Ctrl-C"
+      },
+      {
+        "command": "comint.clear",
+        "title": "Comint Clear Screen"
       }
     ]
   },
   "scripts": {
-    "rebuild": "electron-rebuild -f -w comint -v 18.3.5",
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
@@ -118,14 +135,9 @@
     "@typescript-eslint/eslint-plugin": "^5.31.0",
     "@typescript-eslint/parser": "^5.31.0",
     "@vscode/test-electron": "^2.1.5",
-    "electron-rebuild": "^3.2.9",
     "eslint": "^8.20.0",
     "glob": "^8.0.3",
     "mocha": "^10.0.0",
     "typescript": "^4.7.4"
-  },
-  "dependencies": {
-    "node-gyp": "^8.3.0",
-    "node-pty": "0.11.0-beta20"
   }
 }

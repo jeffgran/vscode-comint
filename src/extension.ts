@@ -1,4 +1,5 @@
 import * as vscode from 'vscode';
+import {getCoreNodeModule} from './getCoreNodeModule';
 import { Comint } from './comint';
 import { ComintCompletionProvider } from './completion';
 
@@ -19,6 +20,10 @@ import { ComintCompletionProvider } from './completion';
 export const comint = new Comint();
 
 export function activate(context: vscode.ExtensionContext) {
+	if (getCoreNodeModule('node-pty') === null) {
+		vscode.window.showErrorMessage('Could not load node-pty. Cannot continue loading comint');
+		return;
+	}
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "comint" is now active!');
