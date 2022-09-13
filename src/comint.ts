@@ -270,10 +270,13 @@ export class Comint {
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const rangeToReplace = comintBuffer.lastPromptInputRange();
     comintBuffer.decrementInputRingIndex();
-    edit.replace(rangeToReplace, comintBuffer.getInputRingInput());
-
-    // kill the selection (doesn't work)
-    //editor.selections = editor.selections.map((selection) => new vscode.Selection(selection.active, selection.active));
+    editor.edit(e => {
+      e.replace(rangeToReplace, comintBuffer.getInputRingInput());
+    }).then(() => {
+      // kill the selection
+      var postion = editor.selection.end;
+      editor.selection = new vscode.Selection(postion, postion);
+    });
   };
 
   inputRingNext = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
@@ -283,10 +286,13 @@ export class Comint {
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const rangeToReplace = comintBuffer.lastPromptInputRange();
     comintBuffer.incrementInputRingIndex();
-    edit.replace(rangeToReplace, comintBuffer.getInputRingInput());
-
-    // kill the selection (doesn't work)
-    //editor.selections = editor.selections.map((selection) => new vscode.Selection(selection.active, selection.active));
+    editor.edit(e => {
+      e.replace(rangeToReplace, comintBuffer.getInputRingInput());
+    }).then(() => {
+      // kill the selection
+      var postion = editor.selection.end;
+      editor.selection = new vscode.Selection(postion, postion);
+    });
   };
 
   _handleMemfsFileChangeEvents = (events: vscode.FileChangeEvent[]) => {

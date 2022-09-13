@@ -13,10 +13,10 @@ export class Directory implements vscode.FileStat {
     ctime: number;
     mtime: number;
     size: number;
-    
+
     name: string;
     entries: Map<string, ComintBuffer | Directory>;
-    
+
     constructor(name: string) {
         this.type = vscode.FileType.Directory;
         this.ctime = Date.now();
@@ -30,15 +30,15 @@ export class Directory implements vscode.FileStat {
 export type Entry = ComintBuffer | Directory;
 
 export class MemFS implements vscode.FileSystemProvider {
-    
+
     root = new Directory('');
-    
+
     // --- manage file metadata
-    
+
     stat(uri: vscode.Uri): vscode.FileStat {
         return this._lookup(uri, false);
     }
-    
+
     readDirectory(uri: vscode.Uri): [string, vscode.FileType][] {
         const entry = this._lookupAsDirectory(uri, false);
         const result: [string, vscode.FileType][] = [];
@@ -47,9 +47,9 @@ export class MemFS implements vscode.FileSystemProvider {
         }
         return result;
     }
-    
+
     // --- manage file contents
-    
+
     readFile(uri: vscode.Uri): Uint8Array {
         const data = this._lookupAsFile(uri, false).data;
         if (data) {
@@ -57,7 +57,7 @@ export class MemFS implements vscode.FileSystemProvider {
         }
         throw vscode.FileSystemError.FileNotFound();
     }
-    
+
     writeFile(uri: vscode.Uri, data: Uint8Array, options: { create: boolean, overwrite: boolean }): void {
         const basename = path.posix.basename(uri.path);
         const parent = this._lookupParentDirectory(uri);
@@ -82,31 +82,31 @@ export class MemFS implements vscode.FileSystemProvider {
         entry.content = data.toString();
         this._fireSoon({ type: vscode.FileChangeType.Changed, uri });
     }
-    
+
     // --- manage files/folders
-    
+
     rename(oldUri: vscode.Uri, newUri: vscode.Uri, options: { overwrite: boolean }): void {
-        
+
         if (!options.overwrite && this._lookup(newUri, true)) {
             throw vscode.FileSystemError.FileExists(newUri);
         }
-        
+
         const entry = this._lookup(oldUri, false);
         const oldParent = this._lookupParentDirectory(oldUri);
-        
+
         const newParent = this._lookupParentDirectory(newUri);
         const newName = path.posix.basename(newUri.path);
-        
+
         oldParent.entries.delete(entry.name);
         entry.name = newName;
         newParent.entries.set(newName, entry);
-        
+
         this._fireSoon(
             { type: vscode.FileChangeType.Deleted, uri: oldUri },
             { type: vscode.FileChangeType.Created, uri: newUri }
             );
         }
-        
+
         delete(uri: vscode.Uri): void {
             const dirname = uri.with({ path: path.posix.dirname(uri.path) });
             const basename = path.posix.basename(uri.path);
@@ -119,12 +119,12 @@ export class MemFS implements vscode.FileSystemProvider {
             parent.size -= 1;
             this._fireSoon({ type: vscode.FileChangeType.Changed, uri: dirname }, { uri, type: vscode.FileChangeType.Deleted });
         }
-        
+
         createDirectory(uri: vscode.Uri): void {
             const basename = path.posix.basename(uri.path);
             const dirname = uri.with({ path: path.posix.dirname(uri.path) });
             const parent = this._lookupAsDirectory(dirname, false);
-            
+
             const entry = new Directory(basename);
             parent.entries.set(entry.name, entry);
             parent.mtime = Date.now();
@@ -137,7 +137,7 @@ export class MemFS implements vscode.FileSystemProvider {
         getComintBuffer(uri: vscode.Uri): ComintBuffer {
             return this._lookupAsFile(uri, false);
         }
-        
+
         private _lookup(uri: vscode.Uri, silent: false): Entry;
         private _lookup(uri: vscode.Uri, silent: boolean): Entry | undefined;
         private _lookup(uri: vscode.Uri, silent: boolean): Entry | undefined {
@@ -162,7 +162,7 @@ export class MemFS implements vscode.FileSystemProvider {
             }
             return entry;
         }
-        
+
         private _lookupAsDirectory(uri: vscode.Uri, silent: boolean): Directory {
             const entry = this._lookup(uri, silent);
             if (entry instanceof Directory) {
@@ -170,7 +170,7 @@ export class MemFS implements vscode.FileSystemProvider {
             }
             throw vscode.FileSystemError.FileNotADirectory(uri);
         }
-        
+
         private _lookupAsFile(uri: vscode.Uri, silent: boolean): ComintBuffer {
             const entry = this._lookup(uri, silent);
             if (entry instanceof ComintBuffer) {
@@ -178,36 +178,35 @@ export class MemFS implements vscode.FileSystemProvider {
             }
             throw vscode.FileSystemError.FileIsADirectory(uri);
         }
-        
+
         private _lookupParentDirectory(uri: vscode.Uri): Directory {
             const dirname = uri.with({ path: path.posix.dirname(uri.path) });
             return this._lookupAsDirectory(dirname, false);
         }
-        
+
         // --- manage file events
-        
+
         private _emitter = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
         private _bufferedEvents: vscode.FileChangeEvent[] = [];
         private _fireSoonHandle?: NodeJS.Timer;
-        
+
         readonly onDidChangeFile: vscode.Event<vscode.FileChangeEvent[]> = this._emitter.event;
-        
+
         watch(_resource: vscode.Uri): vscode.Disposable {
             // ignore, fires for all changes...
             return new vscode.Disposable(() => { });
         }
-        
+
         private _fireSoon(...events: vscode.FileChangeEvent[]): void {
             this._bufferedEvents.push(...events);
-            
+
             if (this._fireSoonHandle) {
                 clearTimeout(this._fireSoonHandle);
             }
-            
+
             this._fireSoonHandle = setTimeout(() => {
                 this._emitter.fire(this._bufferedEvents);
                 this._bufferedEvents.length = 0;
             }, 5);
         }
     }
-    
