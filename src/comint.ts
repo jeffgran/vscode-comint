@@ -259,8 +259,8 @@ export class Comint {
     const comintBuffer = this._memFs.getComintBuffer(editor.document.uri);
     const penultimateLine = editor.document.lineAt(editor.document.lineCount - 2);
     const rangeToDelete = new vscode.Range(new vscode.Position(0, 0), penultimateLine.range.end);
-    const endByteOffset = Buffer.byteLength(editor.document.getText(rangeToDelete));
-    comintBuffer.delete(0, endByteOffset);
+    const endOffset = editor.document.getText(rangeToDelete).length;
+    comintBuffer.delete(0, endOffset);
   };
 
   inputRingPrevious = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit) => {
