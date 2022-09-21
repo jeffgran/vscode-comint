@@ -7,15 +7,17 @@ import { ComintCompletionProvider } from './completion';
 // - kill the process when closing the document?
 //   - warn that the process will be killed before closing the document
 //   - OR: add feature to re-open closed shells?
+// - make it survive reloads? would have to save data on FS?
 // - keep track of the insertion point so we can keep the user input if more output comes
 // - make the prompt detection more performant?
 //   - only keep track of the last one? that's all we need really...
 // - prompt: keep track of which ranges were output vs input, to help with cases like:
+//   | $ vsce package
 //   | `Do you want to continue? [y/N] Do you want to continue? [y/N] y`
 //   | `bash: Do: command not found`
+//   - figure out why this doesn't work even if you just send `y<return>`
 // - input ring should have an empty item at the end/beginning
 //   - integrate input ring with history file
-//   - don't select input after switching input ring
 //   - go-to-beg/end of input ring command
 //   - (ctrl-r)
 // - ansi/sgr
@@ -25,6 +27,10 @@ import { ComintCompletionProvider } from './completion';
 //   ∆ bash
 //   - zsh
 //   - generic (python etc?)
+// - figure out how to default the current directory of the "file" to the `pwd`
+//   - get uri(secretParam=false) ?
+//   - I think just vscode.activeTextEditor.documet |> getComintBuffer |> getCurrentPwd() |> prefill quick open
+// - filter out all control/unprintable characters we don't understand
 
 export const comint = new Comint();
 
