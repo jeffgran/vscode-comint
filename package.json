@@ -2,6 +2,7 @@
   "name": "comint",
   "displayName": "ComInt: Shell in a TextEditor",
   "description": "Inspired by Emacs' comint-mode. Your keyboard shortcuts all work because it's just a regular text editor, with a shell inside.",
+  "repository": "https://github.com/jeffgran/vscode-comint",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.69.0"
