@@ -1,5 +1,6 @@
 import { MemFS } from './fileSystemProvider';
 import * as vscode from 'vscode';
+import * as OS from "os";
 
 // decorations
 const promptDecoration = vscode.window.createTextEditorDecorationType({
@@ -294,6 +295,14 @@ export class Comint {
       editor.selection = new vscode.Selection(postion, postion);
     });
   };
+
+  getCwdUri = (editor: vscode.TextEditor, edit: vscode.TextEditorEdit): vscode.Uri => {
+    if (editor.document.uri.scheme !== "comint") { return editor.document.uri; }
+    const workspaceFolder = vscode.workspace.workspaceFolders && vscode.workspace.workspaceFolders[0];
+    return workspaceFolder?.uri || vscode.Uri.file(OS.homedir());
+  };
+
+  // ----------
 
   _handleMemfsFileChangeEvents = (events: vscode.FileChangeEvent[]) => {
     console.log('comint._handleMemfsFileChangeEvents');

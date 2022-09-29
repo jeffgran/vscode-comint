@@ -1,12 +1,20 @@
 {
   "name": "comint",
+  "publisher": "jeffgran",
   "displayName": "ComInt: Shell in a TextEditor",
   "description": "Inspired by Emacs' comint-mode. Your keyboard shortcuts all work because it's just a regular text editor, with a shell inside.",
-  "repository": "https://github.com/jeffgran/vscode-comint",
-  "version": "0.0.1",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/jeffgran/vscode-comint.git"
+  },
+  "version": "0.0.2",
   "engines": {
     "vscode": "^1.69.0"
   },
+  "author": {
+    "name": "Jeff Gran"
+  },
+  "icon": "images/logo.png",
   "categories": [
     "Other"
   ],

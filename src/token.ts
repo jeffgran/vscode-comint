@@ -9,7 +9,7 @@ const otherUnprintable = "[\\x00-\\x09\\x0b-\\x0c\\x0e-\\x1a\\x1c-\\x1f]+"; // o
 const crlf = "\\r+\\n?"; // a sequence of 0 or more \r followed by 0 or 1 \n
 const tokens = [escC, escControl, escQuestion25, bracketedPaste, ansiSgr, ansiSgrReset, otherUnprintable, crlf];
 export const tokenRe = new RegExp(`(${tokens.join("|")})`, 'g');
-//export const tokenRe = /(\x1bc|\x1b\[[0-9]*[ABCDEFGJKST]|\x1b\[\?25[hl]|\x1b\[([0-9]+;?)+m|\x1b\[[0-9]*m|[\x00-\x09\x0b-\x0c\x0e-\x1a\x1c-\x1f]+|\r+\n?)/g;
+
 export class Token {
   str: string;
   startIndex: number;
