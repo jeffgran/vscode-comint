@@ -8,6 +8,7 @@ Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how 
 
 - Fix password prompt bug where it would show multiple times the first time a password prompt is encountered, 
   and then never work again after the first time. It was a regexp issue.
+- Add `!suggestWidgetVisible` to when clause for `sendInput` so you can press enter to accept a suggestion if that's your thing.
 
 ## [0.0.2]
 

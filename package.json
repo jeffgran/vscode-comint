@@ -68,7 +68,7 @@
       {
         "command": "comint.sendInput",
         "title": "Comint Send Input",
-        "when": "resourceScheme == comint",
+        "when": "resourceScheme == comint && !suggestWidgetVisible",
         "key": "enter",
         "mac": "enter"
       },
