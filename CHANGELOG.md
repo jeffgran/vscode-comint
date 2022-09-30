@@ -4,7 +4,7 @@ All notable changes to the "comint" extension will be documented in this file.
 
 Check [Keep a Changelog](http://keepachangelog.com/) for recommendations on how to structure this file.
 
-## [Unreleased]
+## [0.0.3]
 
 - Fix password prompt bug where it would show multiple times the first time a password prompt is encountered, 
   and then never work again after the first time. It was a regexp issue.
