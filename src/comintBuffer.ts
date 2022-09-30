@@ -275,7 +275,9 @@ export class ComintBuffer implements vscode.FileStat {
     const m = this.content.match(passwordPrompt);
     if (m && m.index !== undefined && m.index + m[0].length === this.content.length) {
       return vscode.window.showInputBox({password: true, title: m[0]}).then(val => {
-        this.proc?.write(val + "\n");
+        if (val !== undefined) {
+          this.proc?.write(val + "\n");
+        }
         return val;
       });
     }

@@ -38,7 +38,6 @@ import { ComintCompletionProvider } from './completion';
 //     - or just make a command. Others can check if the uri scheme is `comint` and if so call the command(s)
 // - filter out all control/unprintable characters we don't understand
 // - `comint-process-echoes` - if the process echoes, strip out a copy of the input from the output before processing.
-// - BUG: password prompt shows twice and then doesn't work again after that?
 // - typing chars should update underlying virtual file
 //   - when typing chars in previous output, the decorations should be maintained
 //   - when typing at the prompt/end, the input should be preserved e.g. when switching to another window and back.

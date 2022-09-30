@@ -101,10 +101,10 @@ const passwordWords = '(?:' + [
 const again = "(?:(?:, try)? *again| \\(empty for no passphrase\\)| \\(again\\))?";
 //    ;; "[[:alpha:]]" used to be "for", which fails to match non-English.
 //    "\\(?: [[:alpha:]]+ .+\\)?[[:blank:]]*[:：៖][[:space:]]*\\'"
-const f0r = "(?: \\w+ .+)?[ \\t]*[:：៖]\\s*";
+const f0r = "(?: \\w+ .+)?[ \\t]*[:：៖] *$";
 //    ;; The ccrypt encryption dialogue doesn't end with a colon, so
 //    ;; treat it specially.
 //    "\\|^Enter encryption key: (repeat) *\\'")
-const ccrypt = "|^Enter encryption key: (repeat) *";
+const ccrypt = "|^Enter encryption key: (repeat) *$";
 
-export const passwordPrompt = new RegExp(`${intros}${passwordWords}${again}${f0r}${ccrypt}`, 'im');
+export const passwordPrompt = new RegExp(`${intros}${passwordWords}${again}${f0r}${ccrypt}`, 'i');
